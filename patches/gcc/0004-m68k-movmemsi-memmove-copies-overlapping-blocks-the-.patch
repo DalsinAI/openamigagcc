@@ -1,0 +1,445 @@
+From 94b9d78dd2060ff3eb6eebad8cc45f80a998af38 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Thu, 8 Oct 2026 23:08:39 +0100
+Subject: [PATCH 4/7] m68k: movmemsi (memmove) copies overlapping blocks the
+ right way
+
+Since GCC 10, the movmem optab is memmove: the blocks may overlap. The
+expander shared cpymemsi's forward copy and only switched to a backward
+copy when both blocks had the same base and constant offsets in MEM_EXPR.
+Anything else was copied forwards, so
+
+    for (i = n; i > 0; --i) v[i] = v[i - 1];      (loop distribution)
+    __builtin_memmove (a + 1, a, 64);
+    std::copy_backward (a, a + 16, a + 17);
+
+with a constant size smeared a[0] over the block at -O1, -O2 and -Os.
+
+movmemsi now copies backwards when the destination is proved to lie
+inside the source (same base register, or the same base followed through
+SSA pointer arithmetic), forwards when that is proved safe, and otherwise
+compares the addresses at run time and runs a forward or a backward copy.
+At -Os an unknown direction calls memmove instead. A backward copy moves
+the odd trailing bytes first, so its longs stay aligned as a forward
+copy's are (68000). cpymemsi (memcpy) is unchanged.
+---
+ gcc/config/m68k/bebbos-tweaks.md |   5 +-
+ gcc/config/m68k/m68k.h           |   2 +-
+ gcc/config/m68k/m68k2.cc         | 314 ++++++++++++++++++++-----------
+ 3 files changed, 207 insertions(+), 114 deletions(-)
+
+diff --git a/gcc/config/m68k/bebbos-tweaks.md b/gcc/config/m68k/bebbos-tweaks.md
+index 4a96b9ef9..62398e1ed 100644
+--- a/gcc/config/m68k/bebbos-tweaks.md
++++ b/gcc/config/m68k/bebbos-tweaks.md
+@@ -96,6 +96,7 @@
+ ;; Argument 1 is the source
+ ;; Argument 2 is the length
+ ;; Argument 3 is the alignment
++;; movmemsi is memmove (the blocks may overlap); cpymemsi is memcpy.
+ (define_expand "movmemsi"
+   [(parallel [(set (match_operand:BLK 0 "general_operand")
+ 		   (match_operand:BLK 1 "general_operand"))
+@@ -103,7 +104,7 @@
+ 	      (use (match_operand:SI 3 "const_int_operand"))])]
+   ""
+ {
+-	if (m68k_emit_movmemsi(operands[0], operands[1], operands[2], operands[3]))
++	if (m68k_emit_movmemsi(operands[0], operands[1], operands[2], operands[3], true))
+ 	  DONE;
+ 	else
+ 	  FAIL;
+@@ -116,7 +117,7 @@
+ 	      (use (match_operand:SI 3 "const_int_operand"))])]
+   ""
+ {
+-	if (m68k_emit_movmemsi(operands[0], operands[1], operands[2], operands[3]))
++	if (m68k_emit_movmemsi(operands[0], operands[1], operands[2], operands[3], false))
+ 	  DONE;
+ 	else
+ 	  FAIL;
+diff --git a/gcc/config/m68k/m68k.h b/gcc/config/m68k/m68k.h
+index be3d49751..56444f810 100644
+--- a/gcc/config/m68k/m68k.h
++++ b/gcc/config/m68k/m68k.h
+@@ -1004,7 +1004,7 @@ extern int m68k_sched_indexed_address_bypass_p (rtx_insn *, rtx_insn *);
+ #define CPU_UNITS_QUERY 1
+ 
+ int
+-m68k_emit_movmemsi(rtx dest, rtx src, rtx length, rtx alignment);
++m68k_emit_movmemsi(rtx dest, rtx src, rtx length, rtx alignment, bool may_overlap);
+ 
+ int
+ m68k_emit_setmemsi(rtx dest, rtx val, rtx length, rtx alignment);
+diff --git a/gcc/config/m68k/m68k2.cc b/gcc/config/m68k/m68k2.cc
+index e06bf71a9..ecb8de5f7 100755
+--- a/gcc/config/m68k/m68k2.cc
++++ b/gcc/config/m68k/m68k2.cc
+@@ -72,6 +72,9 @@
+ #include "rtl-iter.h"
+ #include "toplev.h"
+ #include "df.h"
++#include "gimple.h"
++#include "ssa.h"
++#include "tree-dfa.h"
+ 
+ 
+ /* This file should be included last.  */
+@@ -777,157 +780,246 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
+   return true;
+ }
+ 
+-int
+-m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment)
++/* Block copies for the cpymemsi (memcpy) and movmemsi (memmove) expanders.
++
++   Since GCC 10, "movmem" means memmove: the blocks may overlap.  Loop
++   distribution turns an overlapping "shift up" loop such as
++     for (i = n; i > 0; --i) v[i] = v[i - 1];
++   into memmove (v + 1, v, n * sizeof *v), and std::copy_backward does the same
++   through __builtin_memmove.  A forward copy then smears v[0] over the whole
++   block.  So a memmove is copied forwards only when that is proved safe,
++   backwards when the destination is proved to lie inside the source, and
++   otherwise the direction is chosen at run time (or, at -Os, memmove is
++   called).  */
++
++/* Follow SSA pointer arithmetic back from PTR, adding constant byte offsets
++   to *OFF.  Return the base pointer or object, or NULL_TREE.  */
++static tree
++m68k_pointer_base (tree ptr, HOST_WIDE_INT *off)
+ {
+-  int align = INTVAL(alignment);
+-  int size = INTVAL(length);
+-  int n = optimize_size ? 4 : 16;
+-
+-  rtx regsrc = XEXP(blksrc, 0);
+-  rtx regdst = XEXP(blkdest, 0);
+-  rtx src, dst;
+-  int rest = 0;
+-
+-  /* Default direction is forward (POST_INC) starting at the beginning. */
+-  bool backward = false;
+-
+-  /* 1. Dynamic Overlap & Direction Check using get_inner_reference. */
+-  tree dest_expr = MEM_EXPR (blkdest);
+-  tree src_expr = MEM_EXPR (blksrc);
++  for (int i = 0; i < 16 && TREE_CODE (ptr) == SSA_NAME; i++)
++    {
++      gimple *g = SSA_NAME_DEF_STMT (ptr);
++      if (!g || !is_gimple_assign (g))
++	break;
++      enum tree_code code = gimple_assign_rhs_code (g);
++      tree rhs1 = gimple_assign_rhs1 (g);
++      if (code == POINTER_PLUS_EXPR
++	  && TREE_CODE (gimple_assign_rhs2 (g)) == INTEGER_CST)
++	{
++	  tree c = gimple_assign_rhs2 (g);
++	  *off += wi::sext (wi::to_wide (c), TYPE_PRECISION (TREE_TYPE (c))).to_shwi ();
++	  ptr = rhs1;
++	}
++      else if ((code == SSA_NAME || CONVERT_EXPR_CODE_P (code))
++	       && POINTER_TYPE_P (TREE_TYPE (rhs1)))
++	ptr = rhs1;
++      else if (code == ADDR_EXPR)
++	{
++	  ptr = rhs1;
++	  break;
++	}
++      else
++	break;
++    }
+ 
+-  if (dest_expr && src_expr)
++  if (TREE_CODE (ptr) == ADDR_EXPR)
+     {
+-      poly_int64 d_bitsize, d_bitpos, s_bitsize, s_bitpos;
+-      tree d_offset_tree, s_offset_tree;
+-      machine_mode d_mode, s_mode;
+-      int d_unsignedp, d_reversep, d_volatilep;
+-      int s_unsignedp, s_reversep, s_volatilep;
+-
+-      tree dest_base = get_inner_reference (dest_expr, &d_bitsize, &d_bitpos, &d_offset_tree,
+-					    &d_mode, &d_unsignedp, &d_reversep, &d_volatilep);
+-      tree src_base = get_inner_reference (src_expr, &s_bitsize, &s_bitpos, &s_offset_tree,
+-					   &s_mode, &s_unsignedp, &s_reversep, &s_volatilep);
+-
+-      if (dest_base && src_base && dest_base == src_base)
++      poly_int64 o;
++      tree base = get_addr_base_and_unit_offset (TREE_OPERAND (ptr, 0), &o);
++      if (!base || !o.is_constant ())
++	return NULL_TREE;
++      *off += o.to_constant ();
++      if (TREE_CODE (base) == MEM_REF)
+ 	{
+-	  HOST_WIDE_INT d_off = d_bitpos.to_constant() / BITS_PER_UNIT;
+-	  HOST_WIDE_INT s_off = s_bitpos.to_constant() / BITS_PER_UNIT;
+-
+-	  if (d_offset_tree && TREE_CODE (d_offset_tree) == INTEGER_CST)
+-	    d_off += TREE_INT_CST_LOW (d_offset_tree);
+-	  if (s_offset_tree && TREE_CODE (s_offset_tree) == INTEGER_CST)
+-	    s_off += TREE_INT_CST_LOW (s_offset_tree);
+-
+-	  if (MEM_OFFSET_KNOWN_P (blkdest))
+-	    d_off += MEM_OFFSET (blkdest).to_constant();
+-	  if (MEM_OFFSET_KNOWN_P (blksrc))
+-	    s_off += MEM_OFFSET (blksrc).to_constant();
+-
+-	  /* If destination is ahead of source and they overlap, switch to backward. */
+-	  if (d_off > s_off && d_off < s_off + size)
+-	    backward = true;
++	  *off += mem_ref_offset (base).force_shwi ();
++	  return m68k_pointer_base (TREE_OPERAND (base, 0), off);
+ 	}
++      return base;
+     }
++  return ptr;
++}
++
++/* Find the base (a pointer or an object) and the constant byte offset of the
++   start of block MEM.  Return NULL_TREE if they can't be told.  */
++static tree
++m68k_block_base (rtx mem, HOST_WIDE_INT *off)
++{
++  tree expr = MEM_EXPR (mem);
++  if (!expr || !MEM_OFFSET_KNOWN_P (mem) || !MEM_OFFSET (mem).is_constant ())
++    return NULL_TREE;
++
++  poly_int64 bitsize, bitpos;
++  tree offset;
++  machine_mode mode;
++  int unsignedp, reversep, volatilep;
++  tree base = get_inner_reference (expr, &bitsize, &bitpos, &offset, &mode,
++				   &unsignedp, &reversep, &volatilep);
++  if (!base || offset || !bitpos.is_constant ()
++      || bitpos.to_constant () % BITS_PER_UNIT)
++    return NULL_TREE;
++
++  *off = bitpos.to_constant () / BITS_PER_UNIT + MEM_OFFSET (mem).to_constant ();
++  if (TREE_CODE (base) == MEM_REF || TREE_CODE (base) == TARGET_MEM_REF)
++    {
++      if (TREE_CODE (base) == TARGET_MEM_REF
++	  && (TMR_INDEX (base) || TMR_INDEX2 (base)))
++	return NULL_TREE;
++      *off += mem_ref_offset (base).force_shwi ();
++      return m68k_pointer_base (TREE_OPERAND (base, 0), off);
++    }
++  return base;
++}
++
++/* For a copy of SIZE bytes from SRC to DST: 1 if it must go backwards (DST
++   lies above SRC inside the source block), 0 if a forward copy is safe, -1
++   if this can't be told at compile time.  */
++static int
++m68k_block_move_direction (rtx dst, rtx src, HOST_WIDE_INT size)
++{
++  poly_int64 pd, ps;
++  rtx rd = strip_offset (XEXP (dst, 0), &pd);
++  rtx rs = strip_offset (XEXP (src, 0), &ps);
++  HOST_WIDE_INT d, s;
++  if (rtx_equal_p (rd, rs) && pd.is_constant (&d) && ps.is_constant (&s))
++    return d > s && d < s + size;
++
++  tree bd = m68k_block_base (dst, &d);
++  tree bs = bd ? m68k_block_base (src, &s) : NULL_TREE;
++  if (!bd || !bs)
++    return -1;
++  if (operand_equal_p (bd, bs, 0))
++    return d > s && d < s + size;
++  /* Two different declared objects never overlap.  */
++  if (DECL_P (bd) && DECL_P (bs))
++    return 0;
++  return -1;
++}
++
++/* Emit the copy of SIZE bytes from the address in SRCADDR to the address in
++   DSTADDR, forwards with (An)+ or backwards with -(An) from the ends.  */
++static void
++m68k_emit_block_copy (rtx dstaddr, rtx srcaddr, int size, int align,
++		      bool backward)
++{
++  int n = optimize_size ? 4 : 16;
++  int rest = 0;
++  rtx regsrc = srcaddr, regdst = dstaddr, src, dst;
++  machine_mode unit;
+ 
+-  /* 2. Adjust starting pointers if copying backward.
+-     Two additional instructions are emitted here to calculate the end of the blocks. */
+   if (backward)
+     {
+-      regsrc = plus_constant(Pmode, regsrc, size);
+-      regdst = plus_constant(Pmode, regdst, size);
++      regsrc = plus_constant (Pmode, regsrc, size);
++      regdst = plus_constant (Pmode, regdst, size);
+     }
+ 
+   /* Temporary registers for auto-increment/decrement tracking. */
+-  src = gen_reg_rtx(SImode);
+-  rtx_insn *sinsn = emit_move_insn(src, regsrc);
+-  add_reg_note(sinsn, REG_INC, src);
++  src = gen_reg_rtx (SImode);
++  rtx_insn *sinsn = emit_move_insn (src, regsrc);
++  add_reg_note (sinsn, REG_INC, src);
+   regsrc = src;
+ 
+-  dst = gen_reg_rtx(SImode);
+-  rtx_insn *dinsn = emit_move_insn(dst, regdst);
+-  add_reg_note(dinsn, REG_INC, dst);
++  dst = gen_reg_rtx (SImode);
++  rtx_insn *dinsn = emit_move_insn (dst, regdst);
++  add_reg_note (dinsn, REG_INC, dst);
+   regdst = dst;
+ 
+-  /* 3. Dynamically generate either POST_INC or PRE_DEC MEM expressions. */
+   if (align == 1 && TUNE_68000_10)
+-    {
+-      src = gen_rtx_MEM(QImode, backward ? gen_rtx_PRE_DEC(SImode, regsrc)
+-                                         : gen_rtx_POST_INC(SImode, regsrc));
+-      dst = gen_rtx_MEM(QImode, backward ? gen_rtx_PRE_DEC(SImode, regdst)
+-                                         : gen_rtx_POST_INC(SImode, regdst));
+-    }
++    unit = QImode;
+   else
+     {
++      unit = SImode;
+       rest = size % 4;
+       size /= 4;
+-
+-      src = gen_rtx_MEM(SImode, backward ? gen_rtx_PRE_DEC(SImode, regsrc)
+-                                         : gen_rtx_POST_INC(SImode, regsrc));
+-      dst = gen_rtx_MEM(SImode, backward ? gen_rtx_PRE_DEC(SImode, regdst)
+-                                         : gen_rtx_POST_INC(SImode, regdst));
+     }
+ 
+-  /* 4. The entire loop unrolling infrastructure remains unchanged! */
+-  int nloops = size / n - 1;
+-
+-  if (nloops > get_env_uint ("M68K_MOVMEMSI_MAX_NLOOPS", 63))
+-    return false;
++#define M68K_BLOCK_MOVE(MODE)						\
++  do {									\
++    rtx s_ = gen_rtx_MEM (MODE, backward ? gen_rtx_PRE_DEC (SImode, regsrc) \
++			  : gen_rtx_POST_INC (SImode, regsrc));		\
++    rtx d_ = gen_rtx_MEM (MODE, backward ? gen_rtx_PRE_DEC (SImode, regdst) \
++			  : gen_rtx_POST_INC (SImode, regdst));		\
++    rtx_insn *insn = emit_move_insn (d_, s_);				\
++    add_reg_note (insn, REG_INC, regsrc);				\
++    add_reg_note (insn, REG_INC, regdst);				\
++  } while (0)
++
++  /* Backwards, the trailing bytes come first, so the longs stay where a
++     forward copy would put them (aligned).  */
++  if (backward && (rest & 1))
++    M68K_BLOCK_MOVE (QImode);
++  if (backward && (rest & 2))
++    M68K_BLOCK_MOVE (HImode);
+ 
++  int nloops = size / n - 1;
+   int single = size % n;
+ 
+   if (nloops == 0)
+     single += n;
+   else if (nloops > 0)
+     {
+-      rtx counter = gen_reg_rtx(HImode);
+-      rtx looplabel = gen_label_rtx();
++      rtx counter = gen_reg_rtx (HImode);
++      rtx looplabel = gen_label_rtx ();
+ 
+-      emit_move_insn(counter, GEN_INT(nloops));
+-      emit_label(looplabel);
++      emit_move_insn (counter, GEN_INT (nloops));
++      emit_label (looplabel);
+ 
+-      int count = n;
+-      while (count-- > 0)
+-        {
+-          rtx_insn *insn = emit_move_insn(dst, src);
+-          add_reg_note(insn, REG_INC, regsrc);
+-          add_reg_note(insn, REG_INC, regdst);
+-        }
++      for (int count = n; count > 0; count--)
++	M68K_BLOCK_MOVE (unit);
+ 
+-      emit_jump_insn(gen_dbne_hi(counter, looplabel));
++      emit_jump_insn (gen_dbne_hi (counter, looplabel));
+     }
+ 
+   while (single-- > 0)
+-    {
+-      rtx_insn *insn = emit_move_insn(dst, src);
+-      add_reg_note(insn, REG_INC, regsrc);
+-      add_reg_note(insn, REG_INC, regdst);
+-    }
++    M68K_BLOCK_MOVE (unit);
+ 
+-  /* Move trailing data (dynamically uses updated MEM expressions from above). */
+-  if (rest & 2)
+-    {
+-      src = gen_rtx_MEM(HImode, backward ? gen_rtx_PRE_DEC(SImode, regsrc)
+-                                         : gen_rtx_POST_INC(SImode, regsrc));
+-      dst = gen_rtx_MEM(HImode, backward ? gen_rtx_PRE_DEC(SImode, regdst)
+-                                         : gen_rtx_POST_INC(SImode, regdst));
+-
+-      rtx_insn *insn = emit_move_insn(dst, src);
+-      add_reg_note(insn, REG_INC, regsrc);
+-      add_reg_note(insn, REG_INC, regdst);
+-    }
++  if (!backward && (rest & 2))
++    M68K_BLOCK_MOVE (HImode);
++  if (!backward && (rest & 1))
++    M68K_BLOCK_MOVE (QImode);
+ 
+-  if (rest & 1)
++#undef M68K_BLOCK_MOVE
++}
++
++/* Expand a block copy of constant LENGTH.  MAY_OVERLAP is true for movmemsi
++   (memmove), false for cpymemsi (memcpy).  Return false to let GCC call the
++   library function instead.  */
++int
++m68k_emit_movmemsi (rtx blkdest, rtx blksrc, rtx length, rtx alignment,
++		    bool may_overlap)
++{
++  int align = INTVAL (alignment);
++  int size = INTVAL (length);
++  int n = optimize_size ? 4 : 16;
++  int units = (align == 1 && TUNE_68000_10) ? size : size / 4;
++
++  if (units / n - 1 > (int) get_env_uint ("M68K_MOVMEMSI_MAX_NLOOPS", 63))
++    return false;
++
++  int dir = may_overlap ? m68k_block_move_direction (blkdest, blksrc, size) : 0;
++  if (dir >= 0)
+     {
+-      src = gen_rtx_MEM(QImode, backward ? gen_rtx_PRE_DEC(SImode, regsrc)
+-                                         : gen_rtx_POST_INC(SImode, regsrc));
+-      dst = gen_rtx_MEM(QImode, backward ? gen_rtx_PRE_DEC(SImode, regdst)
+-                                         : gen_rtx_POST_INC(SImode, regdst));
+-
+-      rtx_insn *insn = emit_move_insn(dst, src);
+-      add_reg_note(insn, REG_INC, regsrc);
+-      add_reg_note(insn, REG_INC, regdst);
++      m68k_emit_block_copy (XEXP (blkdest, 0), XEXP (blksrc, 0), size, align,
++			    dir == 1);
++      return true;
+     }
+ 
++  /* The direction is only known at run time.  At -Os, memmove is smaller.  */
++  if (optimize_size)
++    return false;
++
++  rtx dstaddr = force_reg (Pmode, XEXP (blkdest, 0));
++  rtx srcaddr = force_reg (Pmode, XEXP (blksrc, 0));
++  rtx_code_label *back = gen_label_rtx ();
++  rtx_code_label *done = gen_label_rtx ();
++
++  /* Destination above the source: copy backwards.  */
++  emit_cmp_and_jump_insns (dstaddr, srcaddr, GTU, NULL_RTX, Pmode, 1, back);
++  m68k_emit_block_copy (dstaddr, srcaddr, size, align, false);
++  emit_jump_insn (targetm.gen_jump (done));
++  emit_barrier ();
++  emit_label (back);
++  m68k_emit_block_copy (dstaddr, srcaddr, size, align, true);
++  emit_label (done);
+   return true;
+ }

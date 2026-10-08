@@ -6,19 +6,23 @@ It builds on bebbo's amiga-gcc line (GCC for `m68k-amigaos` with libnix) and add
 
 ## Status
 
-**In progress, 8 October 2026.** The fixes below are being written and proved in a lab build. Nothing here is a release yet.
+**Release candidate, 9 October 2026.** The fixes below are proved in a lab build; `16.2.0-open1` is being prepared and is not released yet.
 
 | Bug | Where | Status |
 | --- | --- | --- |
-| `-m68040` float-to-int saves FPCR into the register the store's address indexes with | GCC m68k back end | being fixed |
-| An overlapping "shift up" loop becomes an inline memmove that copies forwards (`-O2` loop distribution) | GCC m68k back end | being fixed |
-| Provable NULL reads become `trap #7` (Software Failure 80000027) | GCC default (`-fdelete-null-pointer-checks`) | driver default being changed |
-| A function's own `calloc` (malloc + memset) is turned into a call to `calloc`, recursing | GCC builtin | driver default being changed |
-| `__stack` doesn't give a program its stack; the stack swap clobbers A2 (80000004) | libnix | fixed, proved in a lab: `patches/libnix/0001`, `docs/libnix-stack-swap.md` |
-| Plain `-fbaserel32` programs never return to the Shell (they return the stack size) | libnix start code | fixed, proved in a lab: `patches/libnix/0002`, `docs/libnix-baserel32-exit.md` |
-| A program's own `UtilityBase`, still NULL, crashes 32-bit multiply/divide (80000004) | libnix | fixed, proved in a lab: `patches/libnix/0003`, `docs/libnix-utilitybase.md` |
+| `-m68040` float-to-int saves FPCR into the register the store's address indexes with | GCC m68k back end | fixed ([docs](docs/fpcr-clash.md)) |
+| An overlapping memmove of constant size copies forwards: shift-up loops at `-O2`, `__builtin_memmove` and `std::copy_backward` at any `-O` | GCC m68k back end | fixed ([docs](docs/memmove-direction.md)) |
+| Provable NULL reads become `trap #7` (Software Failure 80000027) | GCC default (`-fdelete-null-pointer-checks`) | driver default changed ([docs](docs/null-trap7.md)) |
+| A function's own `calloc` (malloc + memset) is turned into a call to `calloc`, recursing | GCC middle end | fixed, and off by default ([docs](docs/calloc-recursion.md)) |
+| `-resident32` alone links the plain `libm020` libraries | GCC multilib setup | fixed ([docs](docs/resident32-multilib.md)) |
+| Roadshow's socket inlines are refused by GCC 16 (argument registers in the clobber list) | amiga-netinclude headers | fixed by the recipe ([docs](docs/netinclude-inline-clobbers.md)) |
+| `__stack` doesn't give a program its stack; the stack swap clobbers A2 (80000004) | libnix | fixed: `patches/libnix/0001` ([docs](docs/libnix-stack-swap.md)) |
+| Plain `-fbaserel32` programs never return to the Shell (they return the stack size) | libnix start code | fixed: `patches/libnix/0002` ([docs](docs/libnix-baserel32-exit.md)) |
+| A program's own `UtilityBase`, still NULL, crashes 32-bit multiply/divide (80000004) | libnix | fixed: `patches/libnix/0003` ([docs](docs/libnix-utilitybase.md)) |
 
-Each fix comes with a small reproducer that is wrong on the old compiler and right on the new one; see `docs/`. The libnix reproducers are in `tests/libnix/`.
+Each fix comes with a small reproducer that is wrong on the old compiler and right on the new one: `tests/repro/prove.sh` runs the GCC ones under `qemu-m68k`, and the libnix ones are in `tests/libnix/`. How to build: [docs/building.md](docs/building.md).
+
+The driver adds three safe defaults, each of which a build can turn back on with the positive option: `-fno-delete-null-pointer-checks`, `-fno-malloc-memset-to-calloc` and `-fno-tree-loop-distribute-patterns`. The last is no longer needed for correctness (the memmove fix covers it), but it keeps a program's own `memset`/`memcpy` loops from becoming calls to themselves.
 
 ## Mixing compilers
 
