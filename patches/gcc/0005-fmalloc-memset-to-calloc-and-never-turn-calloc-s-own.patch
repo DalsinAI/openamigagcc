@@ -1,0 +1,81 @@
+From 09c220bb2b14de37ddf255233f6b33530f776eb5 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Thu, 8 Oct 2026 23:08:40 +0100
+Subject: [PATCH 5/7] -fmalloc-memset-to-calloc, and never turn calloc's own
+ malloc+memset into calloc
+
+A program that defines calloc as malloc + memset had its calloc compiled
+into a call to calloc, which called itself until the stack ran out (an
+FTP client's pooled allocator, October 2026). -fno-builtin-calloc does not
+stop it. The transform is now skipped inside a function named calloc, also
+where calloc was inlined into a caller, and -fno-malloc-memset-to-calloc
+turns it off altogether.
+---
+ gcc/common.opt         |  4 ++++
+ gcc/tree-ssa-strlen.cc | 31 ++++++++++++++++++++++++++++++-
+ 2 files changed, 34 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/common.opt b/gcc/common.opt
+index 204c8ae72..c17708b70 100644
+--- a/gcc/common.opt
++++ b/gcc/common.opt
+@@ -3289,6 +3289,10 @@ foptimize-strlen
+ Common Var(flag_optimize_strlen) Optimization
+ Enable string length optimizations on trees.
+ 
++fmalloc-memset-to-calloc
++Common Var(flag_malloc_memset_to_calloc) Init(1) Optimization
++Turn a malloc followed by a memset of the whole block to zero into calloc.
++
+ fisolate-erroneous-paths-dereference
+ Common Var(flag_isolate_erroneous_paths_dereference) Optimization
+ Detect paths that trigger erroneous or undefined behavior due to
+diff --git a/gcc/tree-ssa-strlen.cc b/gcc/tree-ssa-strlen.cc
+index 91f55ea0f..8024978d5 100644
+--- a/gcc/tree-ssa-strlen.cc
++++ b/gcc/tree-ssa-strlen.cc
+@@ -3814,6 +3814,29 @@ last_stmt_ptr_check (tree ptr, basic_block bb)
+   return true;
+ }
+ 
++/* True if STMT is in a function named calloc: the current function, or one
++   inlined into it.  A program's own calloc built from malloc and memset
++   must not be turned into a call to calloc.  */
++
++static bool
++stmt_in_calloc_p (gimple *stmt)
++{
++  if (current_function_decl
++      && DECL_NAME (current_function_decl)
++      && id_equal (DECL_NAME (current_function_decl), "calloc"))
++    return true;
++  for (tree b = stmt ? gimple_block (stmt) : NULL_TREE;
++       b && TREE_CODE (b) == BLOCK; b = BLOCK_SUPERCONTEXT (b))
++    if (inlined_function_outer_scope_p (b))
++      {
++	tree fn = block_ultimate_origin (b);
++	if (fn && TREE_CODE (fn) == FUNCTION_DECL && DECL_NAME (fn)
++	    && id_equal (DECL_NAME (fn), "calloc"))
++	  return true;
++      }
++  return false;
++}
++
+ /* Check if doing a malloc+memset to calloc is a good idea. PTR is the
+    return value of the malloc/where the memset happens. MALLOC_BB is
+    the basic block of the malloc. MEMSET_BB is basic block of the memset.  */
+@@ -3948,7 +3971,13 @@ strlen_pass::handle_builtin_memset (bool *zero_write)
+   else if (!allow_memset_malloc_to_calloc (ptr, gimple_bb (si1->stmt), gimple_bb (memset_stmt)))
+      return false;
+   else if (code1 == BUILT_IN_MALLOC
+-	   && operand_equal_p (memset_size, alloc_size, 0))
++	   && operand_equal_p (memset_size, alloc_size, 0)
++	   /* -fno-malloc-memset-to-calloc turns this off; and never inside
++	      calloc itself, which a program may define as malloc + memset:
++	      it would call itself for ever.  */
++	   && flag_malloc_memset_to_calloc
++	   && !stmt_in_calloc_p (si1->stmt)
++	   && !stmt_in_calloc_p (memset_stmt))
+     {
+       /* Replace the malloc + memset calls with calloc.  */
+       gimple_stmt_iterator gsi1 = gsi_for_stmt (si1->stmt);

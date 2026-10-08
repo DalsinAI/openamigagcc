@@ -1,0 +1,46 @@
+From 8f1e282ffda3906ca5370a52a60c1360a755f7b1 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Thu, 8 Oct 2026 23:08:40 +0100
+Subject: [PATCH 6/7] amigaos: safe defaults in the driver (null checks,
+ calloc, loop distribution)
+
+DRIVER_SELF_SPECS adds, unless the positive option is given:
+  -fno-delete-null-pointer-checks    address 0 is memory on a 68k Amiga;
+      otherwise a provable NULL read becomes trap #7 (80000027)
+  -fno-malloc-memset-to-calloc       a program's own allocators stay as
+      written
+  -fno-tree-loop-distribute-patterns loops in a program's own mem*
+      functions don't become calls to themselves
+No specs file is used, so the -mcrt link setup is untouched.
+---
+ gcc/config/m68k/m68kamigaos.h | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/config/m68k/m68kamigaos.h b/gcc/config/m68k/m68kamigaos.h
+index a2df75088..57b04eb87 100644
+--- a/gcc/config/m68k/m68kamigaos.h
++++ b/gcc/config/m68k/m68kamigaos.h
+@@ -761,4 +761,22 @@ amigaos_prelink_hook((const char **)(LD1_ARGV), (STRIP))
+    this stove does not build. This keeps libstdc++'s configure link tests
+    (and plain m68k-amigaos-g++ use) on the real C library.  */
+ #undef DRIVER_SELF_SPECS
+-#define DRIVER_SELF_SPECS "%{!mcrt=*:%{!noixemul:%{!nostdlib:-mcrt=nix20}}}"
++#define DRIVER_SELF_SPECS "%{!mcrt=*:%{!noixemul:%{!nostdlib:-mcrt=nix20}}}", \
++  OPENAMIGAGCC_SAFE_DEFAULTS
++
++/* OpenAmigaGCC: safe defaults, built into the driver so no build has to
++   remember them and the link setup (-mcrt) is untouched.  Each one can be
++   turned back on with its positive option on the command line.
++   - Address 0 is memory on a 68k Amiga (chip RAM, exec's pointer at 4).
++     With -fdelete-null-pointer-checks GCC turns a read through a pointer it
++     has proved null into "trap #7" (Software Failure 80000027) and drops
++     null checks that follow a read.
++   - A program's own calloc written as malloc + memset must not become a call
++     to calloc (itself, or a calloc paired with a different malloc).
++   - Loop distribution turns loops into memset/memcpy/memmove calls, which
++     recurse inside a program's own mem* functions and smeared overlapping
++     "shift up" loops before the movmemsi fix.  */
++#define OPENAMIGAGCC_SAFE_DEFAULTS \
++  "%{!fdelete-null-pointer-checks:-fno-delete-null-pointer-checks}", \
++  "%{!fmalloc-memset-to-calloc:-fno-malloc-memset-to-calloc}", \
++  "%{!ftree-loop-distribute-patterns:-fno-tree-loop-distribute-patterns}"

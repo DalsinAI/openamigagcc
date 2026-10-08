@@ -1,0 +1,27 @@
+From 1d179e2f80616b0261bae37c6c2e94181f435c4f Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Thu, 8 Oct 2026 23:09:32 +0100
+Subject: [PATCH 7/7] amigaos: -resident and -resident32 pick the base-relative
+ multilibs
+
+CC1_SPEC compiles -resident as -fbaserel and -resident32 as -fbaserel32, but the multilib selection only looked at -fbaserel/-fbaserel32, so -resident32 without -fbaserel32 linked the plain libm020 libgcc, libnix and libstdc++ into base-relative code. MULTILIB_MATCHES now maps them.
+---
+ gcc/config/m68k/t-amigaos | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/config/m68k/t-amigaos b/gcc/config/m68k/t-amigaos
+index b1ddecd2e..13c46f912 100644
+--- a/gcc/config/m68k/t-amigaos
++++ b/gcc/config/m68k/t-amigaos
+@@ -52,7 +52,10 @@ MULTILIB_EXCEPTIONS = fbaserel/m68881 fbaserel/mcpu=68060/m68881 \
+ # leave the 68000 libraries: -m68030, -m68040, -m68020-40, -m68020-60 and every
+ # -march= spelling linked the 68000 libgcc, libstdc++ and libnix into code
+ # generated for an 020 or better.
++# -resident and -resident32 compile as -fbaserel and -fbaserel32 (CC1_SPEC), so
++# they take the base-relative libraries too; -resident32 alone linked libm020's.
+ MULTILIB_MATCHES    = mcpu?68020=mcpu?68030 mcpu?68020=mcpu?68040 \
+                       mcpu?68020=m68020-40 mcpu?68020=m68020-60 \
+                       mcpu?68020=march?68020 mcpu?68020=march?68030 \
+-                      mcpu?68020=march?68040 mcpu?68060=march?68060
++                      mcpu?68020=march?68040 mcpu?68060=march?68060 \
++                      fbaserel=resident fbaserel32=resident32

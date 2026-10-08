@@ -1,0 +1,69 @@
+From 0307f8568ea5d0d634959513bf18063516fa4373 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Thu, 8 Oct 2026 23:08:39 +0100
+Subject: [PATCH 3/7] m68k: early-clobber the -m68040 fix_trunc scratch
+ registers
+
+With -m68040, (int)x saves FPCR in a data register, sets round-to-zero,
+stores with fmove.l and puts FPCR back. The two scratch registers were
+"=d" without "&", so GCC could pick the register the store's address
+indexes with, e.g.
+
+    move.b (a0)+,d1
+    fmovem.l fpcr,d1
+    ...
+    fmove.l fp0,(a2,d1.l*4)
+
+and the value went to the wrong place (tiny_jpeg wrote flat grey JPEGs).
+Both scratches are written before the store, so both are "=&d".
+---
+ gcc/config/m68k/m68k.md | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
+
+diff --git a/gcc/config/m68k/m68k.md b/gcc/config/m68k/m68k.md
+index 2e3af97f8..615418deb 100644
+--- a/gcc/config/m68k/m68k.md
++++ b/gcc/config/m68k/m68k.md
+@@ -2165,11 +2165,18 @@
+ ;; into the kernel to emulate fintrz.  They should also be faster
+ ;; than calling the subroutines fixsfsi or fixdfsi.
+ 
++;; The two scratch registers are early-clobbered ("=&d"): the first is
++;; written (the saved FPCR) before the fmove stores to operand 0, so it must
++;; not be a register operand 0's address uses.  Without the "&", GCC could
++;; pick the store's index register, e.g.
++;;   fmovem.l fpcr,d1 / ... / fmove.l fp0,(a2,d1.l*4)
++;; and the value went to the wrong place (found October 2026).
++
+ (define_insn "fix_truncdfsi2"
+   [(set (match_operand:SI 0 "nonimmediate_operand" "=dm")
+ 	(fix:SI (fix:DF (match_operand:DF 1 "register_operand" "f"))))
+-   (clobber (match_scratch:SI 2 "=d"))
+-   (clobber (match_scratch:SI 3 "=d"))]
++   (clobber (match_scratch:SI 2 "=&d"))
++   (clobber (match_scratch:SI 3 "=&d"))]
+   "TARGET_68881 && TUNE_68040"
+ {
+   return "fmovem%.l %!,%2\;moveq #16,%3\;or%.l %2,%3\;and%.w #-33,%3\;fmovem%.l %3,%!\;fmove%.l %1,%0\;fmovem%.l %2,%!";
+@@ -2178,8 +2185,8 @@
+ (define_insn "fix_truncdfhi2"
+   [(set (match_operand:HI 0 "nonimmediate_operand" "=dm")
+ 	(fix:HI (fix:DF (match_operand:DF 1 "register_operand" "f"))))
+-   (clobber (match_scratch:SI 2 "=d"))
+-   (clobber (match_scratch:SI 3 "=d"))]
++   (clobber (match_scratch:SI 2 "=&d"))
++   (clobber (match_scratch:SI 3 "=&d"))]
+   "TARGET_68881 && TUNE_68040"
+ {
+   return "fmovem%.l %!,%2\;moveq #16,%3\;or%.l %2,%3\;and%.w #-33,%3\;fmovem%.l %3,%!\;fmove%.w %1,%0\;fmovem%.l %2,%!";
+@@ -2188,8 +2195,8 @@
+ (define_insn "fix_truncdfqi2"
+   [(set (match_operand:QI 0 "nonimmediate_operand" "=dm")
+ 	(fix:QI (fix:DF (match_operand:DF 1 "register_operand" "f"))))
+-   (clobber (match_scratch:SI 2 "=d"))
+-   (clobber (match_scratch:SI 3 "=d"))]
++   (clobber (match_scratch:SI 2 "=&d"))
++   (clobber (match_scratch:SI 3 "=&d"))]
+   "TARGET_68881 && TUNE_68040"
+ {
+   return "fmovem%.l %!,%2\;moveq #16,%3\;or%.l %2,%3\;and%.w #-33,%3\;fmovem%.l %3,%!\;fmove%.b %1,%0\;fmovem%.l %2,%!";
