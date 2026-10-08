@@ -1,0 +1,12 @@
+# OpenAmigaGCC sources: name  url  commit  (where it goes under the work folder)
+# bebbo's amiga-gcc build framework and the modules it builds, at the commits
+# the os32-gcc16 stove was built from (GCC 16.2.0b, 3 October 2026).
+amiga-gcc         https://franke.ms/git/bebbo/amiga-gcc          0c4ec7a63713b8e770ea03260ee6d87597f0ef4a  .
+gcc               https://franke.ms/git/bebbo/gcc                1ff531f6e251e2a30414973208f45555c2bd6118  projects/gcc
+binutils          https://franke.ms/git/bebbo/binutils-gdb       9c09d7d33c8ecd54cc6b0f49d8c05feb4160ce55  projects/binutils
+libnix            https://franke.ms/git/bebbo/libnix             5707d0b8c41da2346656c59b94a0beee1b91903d  projects/libnix
+aros-stuff        https://franke.ms/git/bebbo/aros-stuff         c0a06b4ccd13f52d1518540aa88a450d70581458  projects/aros-stuff
+fd2sfd            https://franke.ms/git/bebbo/fd2sfd             7b73220f99b9bbb94152e8bd673f0f134ad90e11  projects/fd2sfd
+sfdc              https://franke.ms/git/bebbo/sfdc               db0b1d86c7152ec919fdd119bad707aa04a7f775  projects/sfdc
+fd2pragma         https://github.com/adtools/fd2pragma           8c0f352c348a3252f84170eab737919372562e82  projects/fd2pragma
+amiga-netinclude  https://franke.ms/git/bebbo/amiga-netinclude   48b0f9ab4cc6d10b2f5c035d556a2169bdbe6875  projects/amiga-netinclude
