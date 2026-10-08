@@ -1,0 +1,426 @@
+From 546cd4bf00a53c78ce2ab4f35eaf34188edb2a1b Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Thu, 8 Oct 2026 23:04:54 +0100
+Subject: [PATCH 1/3] swapstack: move the stack in assembler; a __stack
+ definition is enough
+
+__stkinit kept the new stack's top in A2 across __MyStackSwap, which
+loads A2 (and A6) without saving them. __SaveSP was then moved by
+&stack - stk_Upper instead of the distance the stack moved, and exit()
+returned through garbage (Software Failure 80000004, or no return).
+
+The move is now one assembler routine, __stkmove(lower, upper,
+&__SaveSP, top): it copies the stack from sp up to tc_SPUpper below
+the new top, swaps
+tc_SPLower/tc_SPUpper and sp under Disable(), adds the distance to
+__SaveSP (and to A5 when a frame pointer points into the moved stack),
+and saves every register it uses. No register, frame or pointer chosen
+by the compiler lives across the switch. __stkexit moves back the same
+way, copying only what lies below __SaveSP (the old stack above it was
+never touched), then frees the new stack.
+
+Defining __stack did nothing unless the program also named __stkinit,
+because nothing pulled swapstack.o out of the library. Every start code
+now references __stkinit, and a default __stack of 0 (keep the stack)
+sits in an object of its own, which a program's own definition
+replaces. So `unsigned long __stack = N;` alone gives the program N
+bytes of stack when it was started with less, from a Shell or from
+Workbench.
+---
+ sources/misc/Makefile.in  |   2 +-
+ sources/misc/__stack.c    |   7 ++
+ sources/misc/swapstack.c  | 208 ++++++++++++++++++++------------------
+ sources/nix13/Makefile.in |   1 +
+ sources/nix13/steal.me    |   3 +-
+ sources/nix20/steal.me    |   2 +-
+ sources/startup/nbcrt0.S  |   1 +
+ sources/startup/ncrt0.S   |   1 +
+ sources/startup/nlbcrt0.S |   1 +
+ sources/startup/nlrcrt0.S |   1 +
+ sources/startup/nrcrt0.S  |   1 +
+ 11 files changed, 128 insertions(+), 100 deletions(-)
+ create mode 100644 sources/misc/__stack.c
+
+diff --git a/sources/misc/Makefile.in b/sources/misc/Makefile.in
+index 2c03f3a..d13758b 100644
+--- a/sources/misc/Makefile.in
++++ b/sources/misc/Makefile.in
+@@ -13,7 +13,7 @@ AWK =		@AWK@
+ 
+ #### End system configuration section ####
+ 
+-OBJECTS=detach.o swapstack.o
++OBJECTS=detach.o swapstack.o __stack.o
+ 
+ OPTIONS=-I$(srcdir)/../headers $(CFLAGS)
+ 
+diff --git a/sources/misc/__stack.c b/sources/misc/__stack.c
+new file mode 100644
+index 0000000..34e4e7f
+--- /dev/null
++++ b/sources/misc/__stack.c
+@@ -0,0 +1,7 @@
++/*
++ * The stack size swapstack.c asks for when the program doesn't define
++ * __stack itself: 0, keep the stack the program was started with.
++ * Kept in a file of its own, so a program's own definition replaces it
++ * (this object is then not taken from the library).
++ */
++unsigned long __stack = 0;
+diff --git a/sources/misc/swapstack.c b/sources/misc/swapstack.c
+index b80a4ef..293dda2 100644
+--- a/sources/misc/swapstack.c
++++ b/sources/misc/swapstack.c
+@@ -1,3 +1,28 @@
++/*
++ * swapstack.c
++ *
++ * A libnix startup module to swap to a new stack if the old one is not
++ * big enough (minimum value set by the value of the __stack variable).
++ *
++ * Code derived from a stackswap module by Kriton Kyrimis (kyrimis@theseas.ntua.gr)
++ *
++ * Fixed by Bebbo.
++ *
++ * Usage: define the stack size the program needs, anywhere in the program:
++ *
++ *   unsigned long __stack = YOUR_STACK_SIZE;
++ *
++ * The start code always links this module, so that line is enough. If the
++ * stack the program was started with (Shell "Stack", or the icon's stack) is
++ * smaller, a new stack of __stack bytes is allocated before main() and given
++ * back at exit(). Without a __stack definition (__stack is 0) nothing happens.
++ *
++ * The stack move itself is assembler (__stkmove): the old version kept a
++ * value in A2 across __MyStackSwap, which overwrote A2 without saving it, so
++ * __SaveSP was moved by a wrong amount and exit() returned through garbage
++ * (80000004). Now no register, frame or pointer chosen by the compiler lives
++ * across the switch.
++ */
+ #include <exec/execbase.h>
+ #include <dos/dos.h>
+ #include <proto/exec.h>
+@@ -11,87 +36,95 @@
+ extern struct ExecBase *SysBase;
+ extern UWORD *__SaveSP;
+ 
+-register UWORD *a7 __asm("sp");
+-
+ #if defined(__KICK13__)
+ extern void * AllocVec(unsigned, int);
+ extern void FreeVec(void *);
+ #endif
+ 
+-#pragma GCC push_options
+-#pragma GCC optimize ("-Os")
+-#pragma GCC optimize ("-fomit-frame-pointer")
+-
+-// keeps d0/d1/a0/a1 free for local use.
+-void __stkswap() {
+-	register struct StackSwapStruct *newStack asm("a2");
+-	register struct ExecBase *SysBase asm("a6");
+-	register UWORD *tmp, *upper asm("a1"), *sp;
+-	struct Task *task = SysBase->ThisTask;
+-
+-	Disable();
+-
+-	tmp = (UWORD*) newStack->stk_Lower;
+-	newStack->stk_Lower = task->tc_SPLower;
+-	task->tc_SPLower = tmp;
+-
+-	tmp = (UWORD*) newStack->stk_Upper;
+-	newStack->stk_Upper = (ULONG) task->tc_SPUpper;
+-	task->tc_SPUpper = tmp;
+-
+-	// copy stack
+-	sp = (UWORD*) newStack->stk_Upper;
+-	upper = tmp;
+-	while (sp != a7)
+-		*--upper = *--sp;
+-
+-	task->tc_SPReg = a7 = upper;
+-
+-	Enable();
+-}
++/* The program's own __stack, or 0 from __stack.c (never swap) */
++extern unsigned long __stack;
+ 
+-// performs no push/pop of a2/a6, it's not necessary...
+-__attribute((noinline)) void __MyStackSwap(volatile struct StackSwapStruct *newStack) {
+-	asm("move.l %0,a2"::"r" (newStack));
+-	asm("move.l %0,a6"::"r" (SysBase));
+-	__stkswap();
+-}
++void __request(const char *text);
+ 
+ /*
+- * swapstack.c
+- *
+- * A libnix startup module to swap to a new stack if the old one is not
+- * big enough (minimum value set by the value of the __stack variable).
+- *
+- * Code derived from a stackswap module by Kriton Kyrimis (kyrimis@theseas.ntua.gr)
++ * long __stkmove(APTR lower, APTR upper, UWORD **saveSP, APTR top)
+  *
+- * Fixed by Bebbo.
+- *
+- * Usage: put this snippet into your main:
+- extern void __stkinit(void);
+- void * __x = __stkinit;
+- unsigned long __stack = YOUR_STACK_SIZE;
++ * Moves the running stack by the distance between 'upper' and the task's
++ * tc_SPUpper:
++ * - copies what lies between sp and 'top' (tc_SPUpper on the way out; on the
++ *   way back __SaveSP, as the old stack above it was never touched),
++ * - sets tc_SPLower/tc_SPUpper to lower/upper and moves sp (under Disable()),
++ * - adds the distance moved to *saveSP, and to the caller's frame pointer a5
++ *   when that points into the moved stack (a libnix built without
++ *   -fomit-frame-pointer),
++ * - returns the distance moved in d0.
++ * Saves d2/a2/a3/a6; plain 68000 code that uses no global, so it is the same
++ * for every variant (baserel, baserel32, resident).
+  */
++long __stkmove(APTR lower, APTR upper, UWORD **saveSP, APTR top);
++
++asm(
++"		.text\n"
++"		.even\n"
++"		.globl	___stkmove\n"
++"___stkmove:\n"
++"		moveml	d2/a2/a3/a6,sp@-\n"
++"		movel	4:W,a6\n"
++"		movel	a6@(276:W),a2\n"	/* ThisTask */
++"		movel	sp@(24:W),d1\n"		/* upper */
++"		movel	d1,d2\n"
++"		subl	a2@(62:W),d2\n"	/* d2 = distance = upper - tc_SPUpper */
++"		movel	sp@(32:W),a0\n"		/* top: copy from here down to sp */
++"		movel	a0,a1\n"
++"		addl	d2,a1\n"
++"1:		cmpl	sp,a0\n"
++"		jls	2f\n"
++"		movew	a0@-,a1@-\n"
++"		jra	1b\n"
++"2:		movel	sp@(20:W),d1\n"		/* lower */
++"		movel	sp@(28:W),a3\n"		/* saveSP */
++"		jsr	a6@(-120:W)\n"		/* Disable() */
++"		movel	d1,a2@(58:W)\n"		/* tc_SPLower */
++"		movel	sp@(24:W),a2@(62:W)\n"	/* tc_SPUpper */
++"		addl	d2,sp\n"
++"		jsr	a6@(-126:W)\n"		/* Enable(), on the new stack */
++"		addl	d2,a3@\n"		/* *saveSP += distance */
++"		movel	a2@(62:W),d1\n"		/* new upper */
++"		subl	d2,d1\n"		/* old upper */
++"		cmpl	a5,d1\n"		/* a5 below the old upper ... */
++"		jls	3f\n"
++"		movel	sp,d0\n"
++"		subl	d2,d0\n"		/* ... and not below the old sp? */
++"		cmpl	a5,d0\n"
++"		jhi	3f\n"
++"		addl	d2,a5\n"
++"3:		movel	d2,d0\n"
++"		moveml	sp@+,d2/a2/a3/a6\n"
++"		rts\n"
++);
+ 
+-extern unsigned long __stack;
+-void __request(const char *text);
++#pragma GCC push_options
++#pragma GCC optimize ("-Os")
++#pragma GCC optimize ("-fomit-frame-pointer")
+ 
+-static volatile struct StackSwapStruct stack;
++static APTR oldlower, oldupper;
+ static char *newstack;
+ 
+-void __stkinit() {
+-	ULONG size, needed = __stack;
++void __stkinit(void) {
++	ULONG needed = __stack;
+ 	struct Task *task;
+ 	char *new;
+-	register UWORD *upper asm("a2"), *to asm("a0"), *sp;
+ 
+-	/* Determine original stack size */
++	if (!needed)
++		return;
++
+ 	task = SysBase->ThisTask;
+ #if defined(__KICK13__)
++	/* Kickstart 1.3 doesn't set the bounds for a Shell command */
+ 	task->tc_SPUpper = __SaveSP + 6;
+ #else
+-	size = (char*) task->tc_SPUpper - (char*) task->tc_SPLower;
+-	if (needed <= size)
++	/* Determine original stack size */
++	if (needed <= (ULONG) ((char*) task->tc_SPUpper - (char*) task->tc_SPLower))
+ 		return;
+ #endif
+ 
+@@ -99,56 +132,37 @@ void __stkinit() {
+ 	needed = (needed + (sizeof(LONG) - 1)) & ~(sizeof(LONG) - 1);
+ 
+ 	/* Allocate new stack */
+-	newstack = new = AllocVec(needed, MEMF_PUBLIC);
++	new = AllocVec(needed, MEMF_PUBLIC);
+ 	if (!new) {
+ 		__request("Couldn't allocate new stack!");
+ 		exit(RETURN_FAIL);
+ 	}
+ 
+-	/* Build new stack structure */
+-	stack.stk_Lower = new;
+-	stack.stk_Upper = (ULONG) (new + needed);
+-
+-	/* Copy required parts of old stack */
+-	to = upper = (UWORD*) stack.stk_Upper;
+-	sp = __SaveSP;
+-
+-	while (sp != a7)
+-		*--to = *--sp;
+-
+-	stack.stk_Pointer = to;
++	oldlower = task->tc_SPLower;
++	oldupper = task->tc_SPUpper;
++	newstack = new;
+ 
+-	/* Switch to new stack */
+-	__MyStackSwap(&stack);
+-
+-	__SaveSP += upper - (UWORD*) stack.stk_Upper;
++	/* Switch to new stack, __SaveSP moves with it */
++	__stkmove(new, new + needed, &__SaveSP, task->tc_SPUpper);
+ }
+ 
+-void __stkexit() {
+-	ULONG size;
+-	register UWORD *upper asm("a2"), *to asm("a0"), *sp;
++void __stkexit(void) {
++	char *stk = newstack;
+ 
+-	if (!newstack)
++	if (!stk)
+ 		return;
++	newstack = 0;
+ 
+-	/* Copy required parts of old stack */
+-	to = upper = (UWORD*) stack.stk_Upper;
+-	sp = __SaveSP;
+-
+-	while (sp != a7)
+-		*--to = *--sp;
+-
+-	stack.stk_Pointer = to;
++	/* Switch back to old stack, then clean up */
++	__stkmove(oldlower, oldupper, &__SaveSP, __SaveSP);
+ 
+-	/* Switch back to old stack */
+-	__MyStackSwap(&stack);
+-
+-	__SaveSP += upper - (UWORD*) stack.stk_Upper;
+-
+-	/* And clean up */
+-	FreeVec(newstack);
++	FreeVec(stk);
+ }
+ 
+-/* The same priority as the detach module - you cannot use them both */
++#pragma GCC pop_options
++
++/* The same priority as the detach module. Both can be linked: detach.o comes
++ * before the libraries, so its init runs first; the parent never returns from
++ * it, and the child gets exactly __stack, so no swap happens there. */
+ ADD2INIT(__stkinit, -70);
+ ADD2EXIT(__stkexit, -70);
+diff --git a/sources/nix13/Makefile.in b/sources/nix13/Makefile.in
+index ff0ee81..fba9bc1 100644
+--- a/sources/nix13/Makefile.in
++++ b/sources/nix13/Makefile.in
+@@ -33,6 +33,7 @@ REDEF=-D_DOSBase=___DOSBase \
+ OBJECTS2= \
+ 	amiga/misc/ArgArray.o \
+ 	misc/swapstack.o \
++	misc/__stack.o \
+ 	nix/extra/dirent.o \
+ 	nix/stdlib/system.o \
+ 	nix/string/strcoll.o \
+diff --git a/sources/nix13/steal.me b/sources/nix13/steal.me
+index 113147b..62bae80 100644
+--- a/sources/nix13/steal.me
++++ b/sources/nix13/steal.me
+@@ -13,4 +13,5 @@ stolen = $(root)/sources/amiga/misc/ArgArray.c \
+ 	$(root)/sources/nix20/locale/__gmtoffset.c \
+ 	$(root)/sources/nix20/locale/setlocale.c \
+ 	$(root)/sources/nix20/locale/localeconv.c \
+-	$(root)/sources/misc/swapstack.c
+\ No newline at end of file
++	$(root)/sources/misc/swapstack.c \
++	$(root)/sources/misc/__stack.c
+diff --git a/sources/nix20/steal.me b/sources/nix20/steal.me
+index 2e09290..22a3f98 100644
+--- a/sources/nix20/steal.me
++++ b/sources/nix20/steal.me
+@@ -1,2 +1,2 @@
+ mcrt = -mcrt=nix20 
+-stolen = $(root)/sources/misc/swapstack.c 
+\ No newline at end of file
++stolen = $(root)/sources/misc/swapstack.c $(root)/sources/misc/__stack.c
+diff --git a/sources/startup/nbcrt0.S b/sources/startup/nbcrt0.S
+index 07894f5..7b7c32a 100644
+--- a/sources/startup/nbcrt0.S
++++ b/sources/startup/nbcrt0.S
+@@ -141,6 +141,7 @@ _SysBase:	.globl _SysBase
+ ___SaveSP:	.globl ___SaveSP
+ 		.long ___initlibraries
+ 		.long ___initcpp
++		.long ___stkinit	| swapstack: a __stack definition is enough
+ 
+ | data area
+ 
+diff --git a/sources/startup/ncrt0.S b/sources/startup/ncrt0.S
+index f73f69c..79b36f2 100644
+--- a/sources/startup/ncrt0.S
++++ b/sources/startup/ncrt0.S
+@@ -118,6 +118,7 @@ _SysBase:	.globl _SysBase
+ ___SaveSP:	.globl ___SaveSP
+ 		.long ___initlibraries
+ 		.long ___initcpp
++		.long ___stkinit	| swapstack: a __stack definition is enough
+ 
+ | data area
+ 
+diff --git a/sources/startup/nlbcrt0.S b/sources/startup/nlbcrt0.S
+index 7f46bb9..76313e6 100644
+--- a/sources/startup/nlbcrt0.S
++++ b/sources/startup/nlbcrt0.S
+@@ -159,6 +159,7 @@ ___SaveSP:	.globl ___SaveSP
+ 		.long ___cpucheck
+ 		.long ___initlibraries
+ 		.long ___initcpp
++		.long ___stkinit	| swapstack: a __stack definition is enough
+ 
+ | data area
+ .comm		__WBenchMsg,4
+diff --git a/sources/startup/nlrcrt0.S b/sources/startup/nlrcrt0.S
+index 41e7ca7..1db9da2 100644
+--- a/sources/startup/nlrcrt0.S
++++ b/sources/startup/nlrcrt0.S
+@@ -197,6 +197,7 @@ ___SaveSP:	.globl ___SaveSP
+ 		.long ___cpucheck
+ 		.long ___initlibraries
+ 		.long ___initcpp
++		.long ___stkinit	| swapstack: a __stack definition is enough
+ 
+ | data area
+ 
+diff --git a/sources/startup/nrcrt0.S b/sources/startup/nrcrt0.S
+index 11fc4b9..676dad9 100644
+--- a/sources/startup/nrcrt0.S
++++ b/sources/startup/nrcrt0.S
+@@ -177,6 +177,7 @@ _SysBase:	.globl _SysBase
+ ___SaveSP:	.globl ___SaveSP
+ 		.long ___initlibraries
+ 		.long ___initcpp
++		.long ___stkinit	| swapstack: a __stack definition is enough
+ 
+ | data area
+ 

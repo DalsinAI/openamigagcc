@@ -14,10 +14,11 @@ It builds on bebbo's amiga-gcc line (GCC for `m68k-amigaos` with libnix) and add
 | An overlapping "shift up" loop becomes an inline memmove that copies forwards (`-O2` loop distribution) | GCC m68k back end | being fixed |
 | Provable NULL reads become `trap #7` (Software Failure 80000027) | GCC default (`-fdelete-null-pointer-checks`) | driver default being changed |
 | A function's own `calloc` (malloc + memset) is turned into a call to `calloc`, recursing | GCC builtin | driver default being changed |
-| `__stack` doesn't give a program its stack; the stack swap clobbers A2 (80000004) | libnix | being fixed |
-| Plain `-fbaserel32` programs never return to the Shell | libnix start code | being fixed |
+| `__stack` doesn't give a program its stack; the stack swap clobbers A2 (80000004) | libnix | fixed, proved in a lab: `patches/libnix/0001`, `docs/libnix-stack-swap.md` |
+| Plain `-fbaserel32` programs never return to the Shell (they return the stack size) | libnix start code | fixed, proved in a lab: `patches/libnix/0002`, `docs/libnix-baserel32-exit.md` |
+| A program's own `UtilityBase`, still NULL, crashes 32-bit multiply/divide (80000004) | libnix | fixed, proved in a lab: `patches/libnix/0003`, `docs/libnix-utilitybase.md` |
 
-Each fix comes with a small reproducer that is wrong on the old compiler and right on the new one; see `docs/`.
+Each fix comes with a small reproducer that is wrong on the old compiler and right on the new one; see `docs/`. The libnix reproducers are in `tests/libnix/`.
 
 ## Mixing compilers
 

@@ -1,0 +1,29 @@
+From aaf94eb3f74b01f38a676dee209d256b300bfd6a Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Thu, 8 Oct 2026 23:01:43 +0100
+Subject: [PATCH 2/3] nlbcrt0: read the exit code before restoring sp
+
+____exit restored sp from __SaveSP and then read the exit code at
+sp@(4), which is above the saved stack pointer: the Shell's stack size,
+not the program's code. Every plain -fbaserel32 program returned the
+stack size (4096 from a default Shell), so a script with FailAt below
+that stopped at it, and the program seemed never to return. Read the
+code first, as ncrt0 and nlrcrt0 do.
+---
+ sources/startup/nlbcrt0.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sources/startup/nlbcrt0.S b/sources/startup/nlbcrt0.S
+index 76313e6..a84f7ad 100644
+--- a/sources/startup/nlbcrt0.S
++++ b/sources/startup/nlbcrt0.S
+@@ -100,8 +100,8 @@ __exit:
+ 
+ __Exit: .globl	__Exit
+ ____exit: .globl	____exit
++		movel	sp@(4:L),d7		| the exit code, before sp is restored
+ 		movel	a4@(___SaveSP:L),sp
+-		movel	sp@(4:L),d7
+ 
+ 		movel	a4@(_SysBase:L),a6
+ 		movel	a4@(__WBenchMsg:L),d2

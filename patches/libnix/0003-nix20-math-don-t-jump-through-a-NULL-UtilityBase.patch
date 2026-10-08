@@ -1,0 +1,154 @@
+From cb3e842c24b4680d495ac6f316581678fd61ba1e Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Thu, 8 Oct 2026 23:01:43 +0100
+Subject: [PATCH 3/3] nix20 math: don't jump through a NULL UtilityBase
+
+__mulsi3, __divsi3/__modsi3 and __udivsi3/__umodsi3 jump into
+utility.library through UtilityBase. A program that defines its own
+UtilityBase does not get libnix's auto-open, so before it opens the
+library itself the first 32-bit multiply or divide (printf's %lu
+among them, on 68000 builds) jumped through NULL: 80000004.
+
+With UtilityBase NULL they now compute the result themselves
+(shift-and-subtract division, three MULUs), with the same results as
+UMult32, UDivMod32 and SDivMod32.
+---
+ sources/nix20/math/__divsi3.c  | 32 +++++++++++++++++++++++++++++++-
+ sources/nix20/math/__mulsi3.c  | 23 +++++++++++++++++++++++
+ sources/nix20/math/__udivsi3.c | 28 +++++++++++++++++++++++++++-
+ 3 files changed, 81 insertions(+), 2 deletions(-)
+
+diff --git a/sources/nix20/math/__divsi3.c b/sources/nix20/math/__divsi3.c
+index 6ab63d3..5d57d79 100644
+--- a/sources/nix20/math/__divsi3.c
++++ b/sources/nix20/math/__divsi3.c
+@@ -1,5 +1,11 @@
+ #include "bases.h"
+ 
++/*
++ * Signed 32-bit division through utility.library (SDivMod32).
++ * When UtilityBase is NULL the unsigned fallback in __udivsi3.c is used
++ * (see there); the quotient truncates towards zero, the remainder takes the
++ * sign of the dividend, as SDivMod32 and C do.
++ */
+ asm(
+ "		.globl	___modsi3;"
+ "		.globl	___divsi3;"
+@@ -16,6 +22,30 @@ asm(
+ "_div:"
+ "_ldiv:"
+ "___divsi3:	moveml	sp@(4:W),d0/d1;"
+-"___divsi4:	movel	"A4(_UtilityBase)",a0;"
++"___divsi4:	tstl	"A4(_UtilityBase)";"
++"		jeq	1f;"
++"		movel	"A4(_UtilityBase)",a0;"
+ "		jmp	a0@(-150:W);"
++
++/* no utility.library */
++
++"1:		moveml	d2/d3,sp@-;"
++"		movel	d0,d3;"		/* sign of the remainder */
++"		movel	d0,d2;"
++"		eorl	d1,d2;"		/* sign of the quotient */
++"		tstl	d0;"
++"		jpl	2f;"
++"		negl	d0;"
++"2:		tstl	d1;"
++"		jpl	3f;"
++"		negl	d1;"
++"3:		jbsr	___udivsi4;"
++"		tstl	d2;"
++"		jpl	4f;"
++"		negl	d0;"
++"4:		tstl	d3;"
++"		jpl	5f;"
++"		negl	d1;"
++"5:		moveml	sp@+,d2/d3;"
++"		rts;"
+ );
+diff --git a/sources/nix20/math/__mulsi3.c b/sources/nix20/math/__mulsi3.c
+index 785d1e4..2af73d2 100644
+--- a/sources/nix20/math/__mulsi3.c
++++ b/sources/nix20/math/__mulsi3.c
+@@ -1,11 +1,34 @@
+ #include "bases.h"
+ 
++/*
++ * 32-bit multiplication through utility.library (UMult32).
++ * When UtilityBase is NULL (see __udivsi3.c) it is done with three MULUs.
++ */
+ asm(
+ "		.globl	___mulsi3;"
+ 
+ /* D0 = D0 * D1 */
+ 
+ "___mulsi3:	moveml	sp@(4),d0/d1;"
++"		tstl	"A4(_UtilityBase)";"
++"		jeq	1f;"
+ "		movel	"A4(_UtilityBase)",a0;"
+ "		jmp	a0@(-138:W);"
++
++/* no utility.library */
++
++"1:		moveml	d2/d3,sp@-;"
++"		movel	d0,d2;"
++"		mulu	d1,d2;"		/* lo(a) * lo(b) */
++"		movel	d0,d3;"
++"		swap	d3;"
++"		mulu	d1,d3;"		/* hi(a) * lo(b) */
++"		swap	d1;"
++"		mulu	d1,d0;"		/* lo(a) * hi(b) */
++"		addw	d3,d0;"
++"		swap	d0;"
++"		clrw	d0;"
++"		addl	d2,d0;"
++"		moveml	sp@+,d2/d3;"
++"		rts;"
+ );
+diff --git a/sources/nix20/math/__udivsi3.c b/sources/nix20/math/__udivsi3.c
+index b3fce9f..e43d218 100644
+--- a/sources/nix20/math/__udivsi3.c
++++ b/sources/nix20/math/__udivsi3.c
+@@ -1,8 +1,15 @@
+ #include "bases.h"
+ 
++/*
++ * Unsigned 32-bit division through utility.library (UDivMod32).
++ * When UtilityBase is NULL (a program that defines its own UtilityBase does
++ * not get libnix's auto-open, and may divide before it opens the library),
++ * a shift-and-subtract division is used instead of jumping through NULL.
++ */
+ asm(
+ "		.globl	___umodsi3;"
+ "		.globl	___udivsi3;"
++"		.globl	___udivsi4;"
+ 
+ /* D1.L = D0.L % D1.L unsigned */
+ 
+@@ -14,6 +21,25 @@ asm(
+ /* D0.L = D0.L / D1.L unsigned */
+ 
+ "___udivsi3:	moveml	sp@(4:W),d0/d1;"
+-"___udivsi4:	movel	"A4(_UtilityBase)",a0;"
++"___udivsi4:	tstl	"A4(_UtilityBase)";"
++"		jeq	1f;"
++"		movel	"A4(_UtilityBase)",a0;"
+ "		jmp	a0@(-156:W);"
++
++/* no utility.library: D0 = D0 / D1, D1 = D0 % D1 */
++
++"1:		moveml	d2/d3,sp@-;"
++"		movel	d1,d2;"
++"		moveq	#0,d1;"
++"		moveq	#31,d3;"
++"2:		addl	d0,d0;"
++"		addxl	d1,d1;"
++"		jcs	3f;"
++"		cmpl	d2,d1;"
++"		jcs	4f;"
++"3:		subl	d2,d1;"
++"		addql	#1,d0;"
++"4:		dbra	d3,2b;"
++"		moveml	sp@+,d2/d3;"
++"		rts;"
+ );
