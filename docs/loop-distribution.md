@@ -33,7 +33,7 @@ libnix's sprintf, strlen and memcpy code is the same in all three builds (a
 comparison of every libnix object finds four unrelated loops different), and
 the program's own string loop compiles to the same code.
 
-The change
+## The change
 
 - The driver adds only `-fno-delete-null-pointer-checks` and
   `-fno-malloc-memset-to-calloc`.
