@@ -14,10 +14,10 @@ O=${OUT:-$(mktemp -d)}; mkdir -p "$O"
 CC="$B/m68k-amigaos-gcc"; CXX="$B/m68k-amigaos-g++"; OBJDUMP="$B/m68k-amigaos-objdump"
 bad=0
 
-image() {   # image NAME [CPU]: link $O/NAME.o into $O/NAME.elf
-  local n=$1 cpu=${2:--m68020}
+image() {   # image NAME [CPU [LIBS]]: link $O/NAME.o into $O/NAME.elf
+  local n=$1 cpu=${2:--m68020} libs=${3:-}
   "$CC" $cpu -O1 -fno-builtin -c "$D/rt.c" -o "$O/rt.o" || return 2
-  "$CC" $cpu -nostartfiles -nostdlib -o "$O/$n.hunk" "$D/crt.s" "$O/$n.o" "$O/rt.o" || return 2
+  "$CC" $cpu -nostartfiles -nostdlib -o "$O/$n.hunk" "$D/crt.s" "$O/$n.o" "$O/rt.o" $libs || return 2
   python3 "$D/mkelf.py" "$O/$n.hunk" "$O/$n.elf" && chmod +x "$O/$n.elf"
 }
 run() {     # run NAME LABEL [QEMUCPU]: run the image, print its line
@@ -46,6 +46,11 @@ for opt in -O1 -O2; do
       r != "" && /fmovel %?fp[0-7],/ { split($0, a, ","); if (index(substr($0, index($0, ",")), r)) bad = 1; r = "" }
       END { exit bad ? 1 : 0 }'; then echo "[$opt -m68040] fpcr code: right (no store through the FPCR register)"
   else echo "[$opt -m68040] fpcr code: WRONG (a store indexes with the FPCR register)"; bad=1; fi
+done
+
+# 64-bit libcall arguments pushed from stack slots, when tuned for the 68040/060
+for opt in "-O1 -m68040" "-O2 -m68040" "-O1 -m68060" "-O2 -m68060" "-Os -m68060" "-O2 -m68020 -mtune=68040"; do
+  "$CC" $opt "$@" -c "$D/push64.c" -o "$O/push64.o" && image push64 -m68020 -lgcc && echo -n "[$opt] " && run push64 push64
 done
 
 "$CC" -m68020 -O2 "$@" -c "$D/calloc.c" -o "$O/calloc.o" && image calloc && echo -n "[-O2] " && run calloc calloc

@@ -69,14 +69,6 @@ for d in binutils/_done gcc/_done libnix/_done libpthread/_done; do
   [ -f "$WORK/build-Linux-m68k-amigaos/$d" ] || { echo "the amiga-gcc build stopped at ${d%/_done} (see $LOGS/make.log and $WORK/log)"; exit 1; }
 done
 
-# 5b. libnix4.a (the static part of the shared libnix, for -mcrt=library). The
-#     shared libnix4.library itself does not link (a duplicate
-#     __vfwprintf_total_size export); static programs don't need it.
-( cd "$WORK" && $NOFETCH make libnix4.library PREFIX="$PREFIX" THREADS=posix NDK=3.2 ) > "$LOGS/libnix4.log" 2>&1 || true
-if [ -f "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.a" ]; then
-  cp "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.a" "$PREFIX/m68k-amigaos/libnix/lib/libb/"
-fi
-
 # 6. libgcc, libstdc++ and the other target libraries, against libnix's
 #    headers, so libstdc++'s configure sees C99 maths, dirent and chdir.
 say "target libraries against libnix"
@@ -91,6 +83,15 @@ for f in $(find "$PREFIX/lib/gcc/m68k-amigaos" -path "*include/c++*" -name c++co
     grep -q "define $d 1" "$f" || sed -i "s|^/\* #undef $d \*/|#define $d 1|" "$f"
   done
 done
+
+# 6b. libnix4.a (the static part of the shared libnix, for -mcrt=library). The
+#     shared libnix4.library itself does not link (a duplicate
+#     __vfwprintf_total_size export); static programs don't need it.
+echo done > "$WORK/build-Linux-m68k-amigaos/gcc/_libgcc_done"   # step 6 built and installed them
+( cd "$WORK" && $NOFETCH make libnix4.library PREFIX="$PREFIX" THREADS=posix NDK=3.2 ) > "$LOGS/libnix4.log" 2>&1 || true
+if [ -f "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.a" ]; then
+  cp "$WORK/build-Linux-m68k-amigaos/libnix/libb/libnix4.a" "$PREFIX/m68k-amigaos/libnix/lib/libb/"
+fi
 
 # 7. Checks.
 say checks

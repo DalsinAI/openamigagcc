@@ -15,6 +15,7 @@ It builds on bebbo's amiga-gcc line (GCC for `m68k-amigaos` with libnix) and add
 | Provable NULL reads become `trap #7` (Software Failure 80000027) | GCC default (`-fdelete-null-pointer-checks`) | driver default changed ([docs](docs/null-trap7.md)) |
 | A function's own `calloc` (malloc + memset) is turned into a call to `calloc`, recursing | GCC middle end | fixed, and off by default ([docs](docs/calloc-recursion.md)) |
 | `-resident32` alone links the plain `libm020` libraries | GCC multilib setup | fixed ([docs](docs/resident32-multilib.md)) |
+| A 64-bit libcall argument pushed from a stack slot reads the wrong word (`-m68040`/`-m68060` tuning) | GCC m68k back end | fixed ([docs](docs/push64-stack-slot.md)) |
 | Roadshow's socket inlines are refused by GCC 16 (argument registers in the clobber list) | amiga-netinclude headers | fixed by the recipe ([docs](docs/netinclude-inline-clobbers.md)) |
 | `__stack` doesn't give a program its stack; the stack swap clobbers A2 (80000004) | libnix | fixed: `patches/libnix/0001` ([docs](docs/libnix-stack-swap.md)) |
 | Plain `-fbaserel32` programs never return to the Shell (they return the stack size) | libnix start code | fixed: `patches/libnix/0002` ([docs](docs/libnix-baserel32-exit.md)) |

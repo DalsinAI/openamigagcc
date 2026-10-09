@@ -11,7 +11,7 @@ commits, with the patches in `patches/`.
   files, rsync, git, lhasa).
 - The AmigaOS 3.2 NDK archive, `NDK3.2.lha`, which you supply. It is not free
   software, so it is never fetched or kept here.
-- About 9 GB of disk and an hour on 8 cores.
+- About 9 GB of disk and 45 minutes on 8 cores.
 
 ## Steps
 
@@ -19,6 +19,17 @@ commits, with the patches in `patches/`.
 scripts/fetch.sh WORK                # clones the sources in scripts/sources.lock (network)
 scripts/build.sh WORK PREFIX /path/to/NDK3.2.lha [JOBS]
 ```
+
+For ARM64 Linux hosts, a Canadian cross on x86-64 (needs
+`aarch64-linux-gnu-gcc` and `-g++`; GMP, MPFR and MPC are built in-tree from
+their release tarballs):
+
+```bash
+scripts/build-arm64.sh WORK X86PREFIX ARMPREFIX TARBALLS
+```
+
+It builds the programs for ARM64 and copies the target libraries and headers,
+which are the same for every host, from the x86-64 build.
 
 `fetch.sh WORK MIRROR` clones from an earlier amiga-gcc checkout instead of
 the network. `build.sh` never fetches: when `unshare` is there it builds with
