@@ -23,7 +23,7 @@ in their memory expressions. Everything else was copied forwards with
 In each case the first element was smeared over the whole block. OpenCrypto's
 sntrup761 broke this way.
 
-`-fno-tree-loop-distribute-patterns` only covers the first case.
+`-fno-tree-loop-distribute-patterns` only covers the first case, and costs the speed of the block move (see `loop-distribution.md`).
 
 ## The fix
 

@@ -1,0 +1,45 @@
+From c6d5ba89cfcc3ba2777040d7bddbe27ac38d4fa5 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Fri, 9 Oct 2026 09:19:35 +0100
+Subject: [PATCH 9/9] amigaos: loop distribution stays on by default
+
+0006 added -fno-tree-loop-distribute-patterns to the driver's defaults.
+With 0004 (movmemsi copies overlapping blocks the way memmove does) loop
+distribution is correct, and turning it off cost real speed: on the AC090 a
+shift-up loop that would be one memmove ran about 3 times slower as a loop
+(3.0 to 3.8 times in repeated runs), a sorted insert 1.2 to 1.3 times.
+
+The default now protects only null-pointer checks and calloc. Code that
+defines its own memcpy, memmove, memset or calloc as a loop (a C library)
+builds with -fno-tree-loop-distribute-patterns itself; libnix's build does
+(scripts/build.sh).
+---
+ gcc/config/m68k/m68kamigaos.h | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/gcc/config/m68k/m68kamigaos.h b/gcc/config/m68k/m68kamigaos.h
+index 57b04eb..8364a95 100644
+--- a/gcc/config/m68k/m68kamigaos.h
++++ b/gcc/config/m68k/m68kamigaos.h
+@@ -773,10 +773,13 @@ amigaos_prelink_hook((const char **)(LD1_ARGV), (STRIP))
+      null checks that follow a read.
+    - A program's own calloc written as malloc + memset must not become a call
+      to calloc (itself, or a calloc paired with a different malloc).
+-   - Loop distribution turns loops into memset/memcpy/memmove calls, which
+-     recurse inside a program's own mem* functions and smeared overlapping
+-     "shift up" loops before the movmemsi fix.  */
++   Loop distribution (-ftree-loop-distribute-patterns) is NOT turned off: with
++   the movmemsi fix a "shift up" loop becomes a correct overlapping memmove, and
++   the pass is worth a lot of speed on a 68k (a shift loop is several times
++   faster as a block move).  Code that defines its own memcpy, memmove, memset
++   or calloc as a loop (a C library) must be built with
++   -fno-tree-loop-distribute-patterns itself, or its loop becomes a call to
++   itself; libnix's build does.  */
+ #define OPENAMIGAGCC_SAFE_DEFAULTS \
+   "%{!fdelete-null-pointer-checks:-fno-delete-null-pointer-checks}", \
+-  "%{!fmalloc-memset-to-calloc:-fno-malloc-memset-to-calloc}", \
+-  "%{!ftree-loop-distribute-patterns:-fno-tree-loop-distribute-patterns}"
++  "%{!fmalloc-memset-to-calloc:-fno-malloc-memset-to-calloc}"
+-- 
+2.53.0
+

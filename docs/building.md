@@ -58,6 +58,8 @@ Programs are AmigaOS 3.x hunk executables linked with libnix:
 m68k-amigaos-gcc -m68020 -O2 -o hello hello.c
 ```
 
-The driver adds `-fno-delete-null-pointer-checks`,
-`-fno-malloc-memset-to-calloc` and `-fno-tree-loop-distribute-patterns`
-unless a build passes the positive form; see `m68k-amigaos-gcc -### -c x.c`.
+The driver adds `-fno-delete-null-pointer-checks` and
+`-fno-malloc-memset-to-calloc` unless a build passes the positive form; see
+`m68k-amigaos-gcc -### -c x.c`. Loop distribution stays on; the build compiles
+libnix and libpthread with `-fno-tree-loop-distribute-patterns` (see
+`loop-distribution.md`).

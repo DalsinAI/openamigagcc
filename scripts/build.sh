@@ -61,9 +61,15 @@ rsync -a --no-group "$WORK/projects/libnix/sources/headers/" "$PREFIX/m68k-amiga
 
 # 5. The toolchain: binutils, GCC, libnix, libpthread, the NDK's headers and
 #    libraries.
+#    The driver leaves loop distribution on (patch 0009), so the C library is
+#    built without it: libnix defines memcpy, memmove, memset, calloc, bcopy
+#    and bzero itself, and a loop in one of them must never become a call to
+#    memset/memcpy/memmove (that is, to itself). CFLAGS_FOR_TARGET reaches
+#    libnix and libpthread; libgcc and libstdc++ define none of these and take
+#    the default.
 say "amiga-gcc (logs in $WORK/log)"
 ( cd "$WORK" && $NOFETCH make -j"$JOBS" binutils gcc gprof libnix libpthread ndk ndk13 \
-    PREFIX="$PREFIX" THREADS=posix NDK=3.2 CFLAGS_FOR_TARGET="-O2 -fomit-frame-pointer" ) > "$LOGS/make.log" 2>&1 || true
+    PREFIX="$PREFIX" THREADS=posix NDK=3.2 CFLAGS_FOR_TARGET="-O2 -fomit-frame-pointer -fno-tree-loop-distribute-patterns" ) > "$LOGS/make.log" 2>&1 || true
 grep -aE '(make|install) [a-z0-9 ]*\.\.\.(done|failed)' "$LOGS/make.log" | sed 's/\x1b\[[0-9;]*[mK]//g' | sort -u
 for d in binutils/_done gcc/_done libnix/_done libpthread/_done; do
   [ -f "$WORK/build-Linux-m68k-amigaos/$d" ] || { echo "the amiga-gcc build stopped at ${d%/_done} (see $LOGS/make.log and $WORK/log)"; exit 1; }
@@ -109,5 +115,26 @@ grep -q 'libnix' "$C/hello.map" || { echo "hello did not link libnix"; exit 1; }
 #include <cstdio>
 int main() { std::vector<int> v{3, 1, 2}; std::sort(v.begin(), v.end()); std::printf("%d%d%d\n", v[0], v[1], v[2]); }
 CXX
+# libnix's own memcpy, memmove, memset, calloc, bcopy, bzero and wmem*: none may call itself,
+# and the block functions none of memset/memcpy/memmove (loop distribution would make that).
+selfcalls() {   # selfcalls OBJECT: the mem* functions OBJECT calls (a relocation to one, or a call/jump to its start)
+  "$PREFIX/bin/m68k-amigaos-objdump" -dr "$1" | grep -E 'R_68K[A-Z0-9_]* +_?(memcpy|memmove|memset|calloc|bcopy|bzero)$|(jsr|bsr|jbsr|jra|jmp).*<_?(memcpy|memmove|memset|calloc|bcopy|bzero)>' \
+    | grep -oE '(memcpy|memmove|memset|calloc|bcopy|bzero)(>|$)' | tr -d '>' | sort -u | tr '\n' ' ' || true
+}
+n=0
+while IFS= read -r a; do
+  D=$(mktemp -d "$C/libnix-members.XXXXXX")
+  ( cd "$D" && "$PREFIX/bin/m68k-amigaos-ar" x "$a" bcopy.o bzero.o calloc.o memcpy.o memmove.o mempcpy.o memset.o wmemcpy.o wmemmove.o wmemset.o 2>/dev/null )
+  for o in "$D"/*.o; do
+    [ -f "$o" ] || continue; f=$(basename "$o" .o); n=$((n+1)); refs=" $(selfcalls "$o")"
+    case $f in   # the calls the sources make on purpose
+      calloc)  refs=${refs/ memset / } ;;       # calloc fills what malloc gave it
+      mempcpy) refs=${refs/ memcpy / } ;;       # mempcpy is memcpy plus a pointer
+      memmove) refs=${refs/ bcopy / } ;;        # memmove is bcopy
+    esac
+    if [ -n "${refs// /}" ]; then echo "libnix: $f.o in $a calls$refs (loop distribution made a library function call itself?)"; exit 1; fi
+  done
+done < <(find "$PREFIX/m68k-amigaos/libnix/lib" -name libnix.a)
+echo "libnix: $n mem*/calloc objects checked; none calls itself or a block function"
 echo "defaults: $("$CC" -### -c -x c /dev/null 2>&1 | grep -o -- '-fno-[a-z-]*' | sort -u | tr '\n' ' ')"
 echo "OpenAmigaGCC built in $PREFIX"
