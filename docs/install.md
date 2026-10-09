@@ -40,10 +40,9 @@ m68k-amigaos-gcc -m68020 -O2 -o hello hello.c
 m68k-amigaos-g++ -m68020 -O2 -std=c++23 -o prog prog.cpp -lpthread -latomic
 ```
 
-The driver adds three safe defaults, each of which a build can turn back on with the positive option:
+The driver adds two safe defaults, each of which a build can turn back on with the positive option:
 - `-fno-delete-null-pointer-checks`: address 0 is memory on an Amiga;
 - `-fno-malloc-memset-to-calloc`: a program's own allocators stay as written;
-- `-fno-tree-loop-distribute-patterns`: a program's own `mem*` loops don't become calls to themselves.
 
 `m68k-amigaos-gcc -### -c x.c` shows them.
 

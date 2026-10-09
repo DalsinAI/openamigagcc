@@ -4,8 +4,9 @@
 # 68k image under qemu-m68k -cpu m68040; checks the code where running can't
 # show the bug (a read of address 0 is not mapped under qemu-m68k).
 # Prints one line per reproducer, "right" or "WRONG", and exits 1 if any is wrong.
-# Extra flags go to every compile, e.g. -ftree-loop-distribute-patterns to
-# check the movmemsi fix with loop distribution back on.
+# Extra flags go to every compile: run it plain (loop distribution is on by
+# default) and with -fno-tree-loop-distribute-patterns; the memmove and shift
+# reproducers must be right either way.
 # MIT licence, Copyright (c) 2026 Dalsin Limited.
 set -u
 B=$1; shift
@@ -57,6 +58,14 @@ done
 if "$OBJDUMP" -d "$O/calloc.o" | awk '/<_calloc>:/,/rts/' | grep -q 'jsr.*_calloc\|jra.*_calloc\|bsr.*_calloc'; then
   echo "[-O2] calloc code: WRONG (calloc calls calloc)"; bad=1
 else echo "[-O2] calloc code: right (calloc doesn't call itself)"; fi
+
+# a library's own memset with a helper loop: -fno-tree-loop-distribute-patterns keeps the loop a loop
+for opt in -O2 -Os; do
+  "$CC" -m68020 $opt "$@" -fno-tree-loop-distribute-patterns -S -o "$O/selfmem.s" "$D/selfmem.c"
+  if awk '/^_fill_bytes:/,/rts/' "$O/selfmem.s" | grep -q 'jsr.*_memset\|jbsr.*_memset\|bsr.*_memset'; then
+    echo "[$opt] selfmem: WRONG (the helper loop became a call to memset)"; bad=1
+  else echo "[$opt] selfmem: right (with -fno-tree-loop-distribute-patterns an own memset loop stays a loop)"; fi
+done
 
 for opt in -O2 -Os; do
   "$CC" -m68020 $opt "$@" -c "$D/null.c" -o "$O/null.o"

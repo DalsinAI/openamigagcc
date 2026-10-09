@@ -14,6 +14,7 @@ It builds on bebbo's amiga-gcc line (GCC for `m68k-amigaos` with libnix) and add
 | An overlapping memmove of constant size copies forwards: shift-up loops at `-O2`, `__builtin_memmove` and `std::copy_backward` at any `-O` | GCC m68k back end | fixed ([docs](docs/memmove-direction.md)) |
 | Provable NULL reads become `trap #7` (Software Failure 80000027) | GCC default (`-fdelete-null-pointer-checks`) | driver default changed ([docs](docs/null-trap7.md)) |
 | A function's own `calloc` (malloc + memset) is turned into a call to `calloc`, recursing | GCC middle end | fixed, and off by default ([docs](docs/calloc-recursion.md)) |
+| Loop distribution off by default (patch 0006) made shift-up and sorted-insert loops 3.8 and 1.3 times slower on the AC090 | GCC driver default | fixed: on again ([docs](docs/loop-distribution.md)) |
 | `-resident32` alone links the plain `libm020` libraries | GCC multilib setup | fixed ([docs](docs/resident32-multilib.md)) |
 | A 64-bit libcall argument pushed from a stack slot reads the wrong word (`-m68040`/`-m68060` tuning) | GCC m68k back end | fixed ([docs](docs/push64-stack-slot.md)) |
 | Roadshow's socket inlines are refused by GCC 16 (argument registers in the clobber list) | amiga-netinclude headers | fixed by the recipe ([docs](docs/netinclude-inline-clobbers.md)) |
@@ -23,7 +24,7 @@ It builds on bebbo's amiga-gcc line (GCC for `m68k-amigaos` with libnix) and add
 
 Each fix comes with a small reproducer that is wrong on the old compiler and right on the new one: `tests/repro/prove.sh` runs the GCC ones under `qemu-m68k`, and the libnix ones are in `tests/libnix/`. How to build: [docs/building.md](docs/building.md).
 
-The driver adds three safe defaults, each of which a build can turn back on with the positive option: `-fno-delete-null-pointer-checks`, `-fno-malloc-memset-to-calloc` and `-fno-tree-loop-distribute-patterns`. The last is no longer needed for correctness (the memmove fix covers it), but it keeps a program's own `memset`/`memcpy` loops from becoming calls to themselves.
+The driver adds two safe defaults, each of which a build can turn back on with the positive option: `-fno-delete-null-pointer-checks` and `-fno-malloc-memset-to-calloc`. Loop distribution stays on (patch 0009): with the memmove fix it is correct, and a shift or insert loop that becomes one block move runs several times faster than the loop. A library that defines its own `memcpy`, `memmove`, `memset` or `calloc` as a loop builds with `-fno-tree-loop-distribute-patterns` (libnix's build does), or the loop becomes a call to itself.
 
 ## Mixing compilers
 
