@@ -15,6 +15,9 @@ Programs it makes are AmigaOS 3.x hunk executables linked with libnix.
 
 ## Install
 
+Both toolchains need glibc 2.38 or later: Ubuntu 24.04 or later, Debian 13 or later (including Raspberry Pi OS based on it), Fedora 39 or later.
+
+
 1. Check and unpack the toolchain for your machine. It works from any folder; `/opt` is used here:
    ```bash
    sha256sum -c --ignore-missing SHA256SUMS
