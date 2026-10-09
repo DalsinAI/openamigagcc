@@ -49,7 +49,7 @@ for opt in -O1 -O2; do
 done
 
 # 64-bit libcall arguments pushed from stack slots, when tuned for the 68040/060
-for opt in "-O1 -m68040" "-O2 -m68040" "-Os -m68060" "-O2 -m68020 -mtune=68040"; do
+for opt in "-O1 -m68040" "-O2 -m68040" "-O1 -m68060" "-O2 -m68060" "-Os -m68060" "-O2 -m68020 -mtune=68040"; do
   "$CC" $opt "$@" -c "$D/push64.c" -o "$O/push64.o" && image push64 -m68020 -lgcc && echo -n "[$opt] " && run push64 push64
 done
 
