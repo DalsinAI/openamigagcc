@@ -77,6 +77,8 @@ echo "== assembling $ARM"
 mkdir -p "$ARM"
 rsync -a "$X86/" "$ARM/"
 rsync -a "$STAGE$PREFIX/" "$ARM/"
+# the programs without their debug information, as the x86-64 build's are
+find "$ARM" -type f -exec file {} + | grep 'ELF.*aarch64' | cut -d: -f1 | xargs $HOST-strip --strip-unneeded
 left=$(find "$ARM" -type f -exec file {} + | grep -E 'ELF.*x86-64' | cut -d: -f1 || true)
 if [ -n "$left" ]; then echo "x86-64 programs left in $ARM:"; echo "$left"; exit 1; fi
 echo "ARM64 programs: $(find "$ARM" -type f -exec file {} + | grep -c 'ELF.*aarch64')"
