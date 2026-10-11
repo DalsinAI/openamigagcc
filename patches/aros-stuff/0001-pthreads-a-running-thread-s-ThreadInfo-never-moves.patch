@@ -1,0 +1,96 @@
+pthreads: a running thread's ThreadInfo never moves
+
+The thread table was one array of ThreadInfo that pthread_create grew with
+realloc (1, 4, 10, 22 ... slots). A running thread keeps a pointer to its own
+ThreadInfo in StarterFunc from start to finish, and uses it again after its
+start routine returns, in the loop that runs the TLS destructors. Creating the
+4th, 10th, 22nd ... thread while earlier threads still ran moved the array, so
+those threads read and wrote freed memory when they ended. With a TLS key that
+has a destructor (libgcc's emutls key: C++ thread_local, std::call_once) the
+loop called the destructor on whatever was there: Software Failure 80000003 or
+80000006 in "pthread thread #1" or "#2", or a program that never finishes.
+
+The table is now an array of PTHREAD_THREADS_MAX pointers, allocated once;
+each ThreadInfo is allocated once, when its slot is first needed, and stays put.
+
+Reproducer: tests/pthreads/t3race.cpp (one consumer, four producers, each
+using thread_local and call_once; the 4th producer is the 5th thread).
+
+--- a/pthreads/pthread.c
++++ b/pthreads/pthread.c
+@@ -117,7 +117,10 @@
+ 	jmp_buf jmp;
+ } ThreadInfo;
+ 
+-static ThreadInfo *_threads;
++/* One ThreadInfo per slot, each allocated once and never moved: a running
++   thread keeps its ThreadInfo pointer for its whole life (StarterFunc), so
++   growing the table must not realloc the ThreadInfos themselves. */
++static ThreadInfo **_threads;
+ static unsigned numThreads;
+ static struct SignalSemaphore thread_sem;
+ static TLSKey *_tlskeys;
+@@ -152,7 +155,7 @@
+ 
+ 	// TODO: more robust error handling?
+ 	if (thread < numThreads)
+-		return &_threads[thread];
++		return _threads[thread];
+ 
+ 	return 0;
+ }
+@@ -165,7 +168,7 @@
+ 
+ // 0 is main task, First thread id will be 1 so that it is different than default value of pthread_t
+ 	for (i = 0; i < numThreads; i++) {
+-		if (_threads[i].task == task)
++		if (_threads[i]->task == task)
+ 			break;
+ 	}
+ 
+@@ -1559,15 +1562,16 @@
+ 			n = PTHREAD_THREADS_MAX;
+ 
+ 		if (n != numThreads) {
+-			ThreadInfo *t = (ThreadInfo*) realloc(_threads, n * sizeof(ThreadInfo));
+-			if (!t) {
+-				ReleaseSemaphore(&thread_sem);
+-				return EAGAIN;
++			unsigned i;
++			for (i = numThreads; i < n; i++) {
++				ThreadInfo *t = (ThreadInfo*) calloc(1, sizeof(ThreadInfo));
++				if (!t) {
++					numThreads = i;
++					ReleaseSemaphore(&thread_sem);
++					return EAGAIN;
++				}
++				_threads[i] = t;
+ 			}
+-
+-			memset(&t[numThreads], 0, (n - numThreads) * sizeof(ThreadInfo));
+-
+-			_threads = t;
+ 			numThreads = n;
+ 		}
+ 	}
+@@ -2035,13 +2039,16 @@
+ 	InitSemaphore(&tls_sem);
+ 
+ 	// reserve ID 0 for the main thread
+-	_threads = (ThreadInfo*) malloc(sizeof(ThreadInfo) * INITIALSIZE);
++	_threads = (ThreadInfo**) calloc(PTHREAD_THREADS_MAX, sizeof(ThreadInfo*));
+ 	if (!_threads)
+ 		exit(10);
+-	memset(_threads, 0, sizeof(ThreadInfo) * INITIALSIZE);
+-	numThreads = INITIALSIZE;
++	for (numThreads = 0; numThreads < INITIALSIZE; numThreads++) {
++		_threads[numThreads] = (ThreadInfo*) calloc(1, sizeof(ThreadInfo));
++		if (!_threads[numThreads])
++			exit(10);
++	}
+ 
+-	ThreadInfo *inf = &_threads[0];
++	ThreadInfo *inf = _threads[0];
+ #ifdef __AMIGA__
+ 	inf->task = SysBase->ThisTask;
+ #else
