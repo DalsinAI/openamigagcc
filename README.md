@@ -22,8 +22,9 @@ It builds on bebbo's amiga-gcc line (GCC for `m68k-amigaos` with libnix) and add
 | Plain `-fbaserel32` programs never return to the Shell (they return the stack size) | libnix start code | fixed: `patches/libnix/0002` ([docs](docs/libnix-baserel32-exit.md)) |
 | A program's own `UtilityBase`, still NULL, crashes 32-bit multiply/divide (80000004) | libnix | fixed: `patches/libnix/0003` ([docs](docs/libnix-utilitybase.md)) |
 | Soft-float doubles (`-m68060`, or `-m68020` without `-m68881`) rounded to single precision on an Amiga with an FPU: OS 3.2's IEEE libraries set FPCR when libnix opens them | libnix start code | fixed: `patches/libnix/0004` ([docs](docs/libnix-fpcr.md)) |
+| A thread that was running when a later thread was created reads freed memory as it ends: C++ `thread_local` or `call_once` in several threads crashes (80000003, 80000006) or hangs | libpthread (aros-stuff) | fixed: `patches/aros-stuff/0001` ([docs](docs/pthreads-thread-table.md)) |
 
-Each fix comes with a small reproducer that is wrong on the old compiler and right on the new one: `tests/repro/prove.sh` runs the GCC ones and libnix's FPCR one under `qemu-m68k`, and the other libnix ones are in `tests/libnix/`. How to build: [docs/building.md](docs/building.md).
+Each fix comes with a small reproducer that is wrong on the old compiler and right on the new one: `tests/repro/prove.sh` runs the GCC ones and libnix's FPCR one under `qemu-m68k`, the other libnix ones are in `tests/libnix/`, and the libpthread one is `tests/pthreads/t3race.cpp`. How to build: [docs/building.md](docs/building.md).
 
 The driver adds two safe defaults, each of which a build can turn back on with the positive option: `-fno-delete-null-pointer-checks` and `-fno-malloc-memset-to-calloc`. Loop distribution stays on (patch 0009): with the memmove fix it is correct, and a shift or insert loop that becomes one block move runs several times faster than the loop. A library that defines its own `memcpy`, `memmove`, `memset` or `calloc` as a loop builds with `-fno-tree-loop-distribute-patterns` (libnix's build does), or the loop becomes a call to itself.
 
@@ -33,6 +34,6 @@ Programs built with GCC 6.5 (the older `os32` stove) calling libraries built wit
 
 ## Licence
 
-GCC is GPL-3.0 (with the GCC Runtime Library Exception), and the patches to it here are GPL-3.0 too; see `LICENSE`. libnix's patches follow libnix's own licence. No AmigaOS NDK or other non-free files are kept here; the build recipe expects the NDK to be supplied separately.
+GCC is GPL-3.0 (with the GCC Runtime Library Exception), and the patches to it here are GPL-3.0 too; see `LICENSE`. libnix's patches follow libnix's own licence, and the libpthread patch follows aros-stuff's pthreads licence (zlib-style). No AmigaOS NDK or other non-free files are kept here; the build recipe expects the NDK to be supplied separately.
 
 Part of the Open family by the Team · github.com/DalsinAI
