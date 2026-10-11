@@ -1,0 +1,69 @@
+From bb32ff4412c57e437970dc66665f6797f3aa3811 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 21:54:03 +0100
+Subject: [PATCH] __initlibraries: leave FPCR at 0 once the libraries are open
+
+On an Amiga with an FPU, OS 3.2's IEEE maths libraries set FPCR in the
+task that opens them: mathieeedoubbas.library 47.3 sets $10 (round
+toward zero), the Kickstart's mathieeesingbas.library 47.1 sets $40
+(single precision). libnix opens them in the program's own task at
+startup, and their FPU code then works under that FPCR. A soft-float
+program (any -m68060 build, or -m68020 without -m68881) that uses
+floats and doubles opens mathieeesingbas last, and every double
+operation (__adddf3, __muldf3, ... through mathieeedoubbas) is rounded
+to single precision: 64-bit integer to double conversions lose their
+low bits. One with doubles only rounds toward zero.
+
+After opening the libraries, __initlibraries now sets FPCR to 0 (round
+to nearest, extended precision, no exception enabled) when AttnFlags
+shows an FPU.
+---
+ sources/nix/misc/__initlibraries.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/sources/nix/misc/__initlibraries.c b/sources/nix/misc/__initlibraries.c
+index 488a851..dc91d70 100644
+--- a/sources/nix/misc/__initlibraries.c
++++ b/sources/nix/misc/__initlibraries.c
+@@ -1,3 +1,4 @@
++#include <exec/execbase.h>
+ #include <proto/exec.h>
+ #include <proto/dos.h>
+ #include "stabs.h"
+@@ -43,6 +44,25 @@ static int endswithResource(char const * name) {
+ 	return 1;
+ }
+ 
++/*
++ * On a machine with an FPU, OS 3.2's IEEE maths libraries set the FPU control
++ * register of the task that opens them: mathieeedoubbas.library 47.3 sets
++ * FPCR to $10 (round toward zero), the Kickstart's mathieeesingbas.library
++ * 47.1 sets $40 (round to single precision). Their FPU code works under the
++ * task's FPCR, and so does the program's own FPU code. A program that uses
++ * floats and doubles opens mathieeesingbas last, and then every double
++ * operation of its soft-float code (__adddf3, __muldf3, ... through
++ * mathieeedoubbas) is rounded to single precision. A Shell's process also
++ * keeps whatever FPCR the previous program left.
++ * So once the libraries are open, the program starts with the FPU's reset
++ * value, which is what C expects: round to nearest, extended precision, no
++ * exception enabled.
++ */
++static void __fpcr_reset(void) {
++	if (SysBase->AttnFlags & AFF_68881)
++		__asm__ volatile ("moveq #0,d0\n\t.short 0xf200,0x9000" ::: "d0");	/* fmove.l d0,fpcr */
++}
++
+ void __initlibraries(void) {
+ 	long * l = &__LIB_LIST__ + 1;
+ 	long failed = 0;
+@@ -55,6 +75,7 @@ void __initlibraries(void) {
+ 		else
+ 			failed = 1;
+ 	}
++	__fpcr_reset();
+ 	if (failed)
+  		  __openliberror();
+ }
+-- 
+2.53.0
+

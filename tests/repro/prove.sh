@@ -7,6 +7,9 @@
 # Extra flags go to every compile: run it plain (loop distribution is on by
 # default) and with -fno-tree-loop-distribute-patterns; the memmove and shift
 # reproducers must be right either way.
+# NIXOBJ (optional): objects linked ahead of the stove's libnix in the softfloat
+# reproducer, such as a fixed __initlibraries.o, to prove a libnix fix before a
+# stove rebuild.
 # MIT licence, Copyright (c) 2026 Dalsin Limited.
 set -u
 B=$1; shift
@@ -52,6 +55,16 @@ done
 # 64-bit libcall arguments pushed from stack slots, when tuned for the 68040/060
 for opt in "-O1 -m68040" "-O2 -m68040" "-O1 -m68060" "-O2 -m68060" "-Os -m68060" "-O2 -m68020 -mtune=68040"; do
   "$CC" $opt "$@" -c "$D/push64.c" -o "$O/push64.o" && image push64 -m68020 -lgcc && echo -n "[$opt] " && run push64 push64
+done
+
+# soft-float doubles (-m68060, and -m68020 without -m68881) on a machine with an FPU:
+# libnix's own __initlibraries opens the IEEE libraries (mathieee.s models OS 3.2.3's,
+# which set the task's FPCR when opened) and must leave FPCR at 0 for their FPU code
+NIXLIBS="${NIXOBJ:-} -L$B/../m68k-amigaos/libnix/lib -Wl,--start-group -lm -lnix -lstubs -lgcc -Wl,--end-group"
+for c in "-m68060 m68060" "-m68020 m68040"; do
+  cpu=${c% *}; qcpu=${c#* }
+  "$CC" $cpu -O2 "$@" -c "$D/softfloat.c" -o "$O/softfloat.o" && "$CC" $cpu -c "$D/mathieee.s" -o "$O/mathieee.o" &&
+    image softfloat $cpu "$O/mathieee.o $NIXLIBS" && echo -n "[-O2 $cpu] " && run softfloat softfloat "$qcpu"
 done
 
 "$CC" -m68020 -O2 "$@" -c "$D/calloc.c" -o "$O/calloc.o" && image calloc && echo -n "[-O2] " && run calloc calloc
