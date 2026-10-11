@@ -9,3 +9,5 @@ m68k-amigaos-g++ -m68020 -m68881 -O2 -fomit-frame-pointer -std=gnu++23 -o t3race
 ```
 
 This needs a real AmigaOS: qemu-m68k's user mode has no exec tasks.
+
+`t3w_warm.cpp`: the same test after a warm-up that has five threads alive at once, so libpthread's thread table has grown before any thread of the real test runs. With the stove's unpatched library it hung once on Instance-32 (11 Oct 2026), and the agent's next command, which needed DH1:, never ran. Not explained yet: build and run it the same way, and record whether a run hangs and where.
