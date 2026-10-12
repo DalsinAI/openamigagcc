@@ -46,6 +46,8 @@ The driver adds two safe defaults, each of which a build can turn back on with t
 
 `m68k-amigaos-gcc -### -c x.c` shows them.
 
+C++ is compiled with `-fuse-cxa-atexit`, so `thread_local` destructors run when their thread ends; libnix provides `__cxa_atexit` and `__dso_handle`. A C++ program built for another C library (`-mcrt=clib2`, `ixemul`, `newlib`) with a static object that has a destructor needs `-fno-use-cxa-atexit`.
+
 ## Licences
 
 - GCC, libgcc, libstdc++ and binutils: GPL-3.0-or-later. The GCC Runtime Library Exception applies to libgcc and libstdc++, so programs you build can be under any licence you choose.
