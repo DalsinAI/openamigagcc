@@ -1,0 +1,107 @@
+pthreads: pthread_detach works, a detached thread frees its slot, join gives thread_sem back
+
+pthread_detach was a stub that returned ESRCH, so std::thread::detach threw
+"No such process". It now marks the thread detached; a detached thread
+frees its slot when it ends (and is not waited for), and one that has ended
+already frees it at once. A thread created detached does the same, where
+before its slot was never given back.
+
+pthread_join returned ESRCH and EINVAL with thread_sem still held, so the
+next pthread call in any thread waited for ever.
+
+pthread_create read the new thread's task after giving thread_sem back; a
+detached thread that ended at once had freed its slot by then, and the
+create said EAGAIN for a thread that had run. It reads it before.
+
+Proven on AmigaOS 3.2 in a lab copy of Instance-32 with the stove's
+qualification test t19 (1150 threads; 50 of them detached):
+  stock:  "std::thread::detach threw: No such process", FAIL 50 detached
+  0002:   PASS 50 detached threads; with -fuse-cxa-atexit (t19c), t19 OK
+---
+--- a/pthreads/pthread.c	2026-10-12 01:13:56.683242160 +0100
++++ b/pthreads/pthread.c	2026-10-12 01:13:56.686080035 +0100
+@@ -1526,8 +1526,15 @@
+ 	DB2(bug("%s(releasing inf ptr %8lx)\n", __FUNCTION__, inf));
+ 	// tell the parent thread that we are done
+ 	Forbid();
+-	inf->task = (struct Task *)-1;
+ 	inf->finished = 1;
++	if (inf->attr.detachstate == PTHREAD_CREATE_DETACHED) {
++		// nobody will join it: the slot is free again (pthread_create takes a slot whose task is NULL),
++		// and its parent, which may have ended, is not signalled
++		inf->task = NULL;
++		ReleaseSemaphore(&thread_sem);
++		return;
++	}
++	inf->task = (struct Task *)-1;
+ 	ReleaseSemaphore(&thread_sem);
+ 	Signal(inf->parent, SIGF_PARENT);
+ }
+@@ -1617,13 +1624,16 @@
+ #endif
+ 			NP_Name, (IPTR) name, TAG_DONE);
+ 
+-	ReleaseSemaphore(&thread_sem);
++	{
++		struct Task *started = inf->task;
++		if (!started)
++			inf->parent = NULL;
++		ReleaseSemaphore(&thread_sem);
+ 
+-	D(bug("new thread=%ld, task=%8lx, fini=%ld, detach=%ld\n", threadnew, inf->task, (int)inf->finished, (int)inf->attr.detachstate));
++		D(bug("new thread=%ld, task=%8lx\n", threadnew, started));
+ 
+-	if (!inf->task) {
+-		inf->parent = NULL;
+-		return EAGAIN;
++		if (!started)
++			return EAGAIN;
+ 	}
+ 
+ 	*thread = threadnew;
+@@ -1632,9 +1642,25 @@
+ }
+ 
+ int pthread_detach(pthread_t thread) {
+-	D(bug("%s(%ld) not implemented\n", __FUNCTION__, thread));
++	ThreadInfo *inf;
++
++	D(bug("%s(%ld)\n", __FUNCTION__, thread));
+ 
+-	return ESRCH;
++	ObtainSemaphore(&thread_sem);
++	inf = GetThreadInfo(thread);
++	if (inf == NULL || !inf->task) {
++		ReleaseSemaphore(&thread_sem);
++		return ESRCH;
++	}
++	if (inf->attr.detachstate == PTHREAD_CREATE_DETACHED) {
++		ReleaseSemaphore(&thread_sem);
++		return EINVAL;
++	}
++	inf->attr.detachstate = PTHREAD_CREATE_DETACHED;
++	if (inf->finished)
++		inf->task = NULL;	// it has ended already: its slot is free now
++	ReleaseSemaphore(&thread_sem);
++	return 0;
+ }
+ 
+ int pthread_join(pthread_t thread, void **value_ptr) {
+@@ -1650,11 +1676,15 @@
+ 	ObtainSemaphore(&thread_sem);
+ 	inf = GetThreadInfo(thread);
+ 	D(bug("%s(%ld, inf=%8lx, fini=%ld, detach=%ld, started=%ld)\n", __FUNCTION__, thread, inf, (int)(inf ? inf->finished : 0), (int)(inf ? inf->attr.detachstate : 0), inf->started));
+-	if (inf == NULL || !inf->task)
++	if (inf == NULL || !inf->task) {
++		ReleaseSemaphore(&thread_sem);
+ 		return ESRCH;
++	}
+ 
+-	if (inf->attr.detachstate)
++	if (inf->attr.detachstate) {
++		ReleaseSemaphore(&thread_sem);
+ 		return EINVAL;
++	}
+ 
+ 	// busy yield loop...
+ 	while (!inf->started || !inf->finished) {
