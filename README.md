@@ -6,7 +6,7 @@ It builds on bebbo's amiga-gcc line (GCC for `m68k-amigaos` with libnix) and add
 
 ## Status
 
-**Release candidate, 9 October 2026.** The fixes below are proved in a lab build; `16.2.0-open1` is being prepared and is not released yet.
+**16.2.0-open2, 12 October 2026** ([notes](docs/releases/16.2.0-open2.md), [install](docs/install.md)): every fix below. `16.2.0-open1` (9 October 2026) has the fixes up to libnix 0003.
 
 | Bug | Where | Status |
 | --- | --- | --- |
