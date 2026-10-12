@@ -198,9 +198,9 @@ Lab (copy of Instance-32, clean start each run, 60 s):
 - **Threads under -fbaserel32** hang even with 0007 and a base-relative libos32compat. Likely the new tasks libpthread starts never load a4 (a base-relative task entry needs `geta4`); not checked yet.
 - **Fix 2 (GCC 0011, absptr EH data format)** not done: it needs a gcc and target-library rebuild, and the release rebuild is running on WorkingSpace. The "out of range" lines are still there (18 for nothreads, 25 for t3) with 0007.
 
-## Fix 4: aros-stuff 0005 (libpthread's thread entry)
+## Fix 4: aros-stuff 0005 (libpthread's thread entry), reworked
 
-`StarterFunc`, the `NP_Entry` of every thread's process, ran with no a4. `__saveds` does nothing with this stove (an empty `__saveds` function compiles to a bare `rts` under `-fbaserel`; `StarterFunc` with it still read `a4@(0)` for SysBase first), so under `__baserel__` it now does `jsr _geta4` (the startup code's) and tail-calls the body. `objdump`: libb, libb/libm020 and libb32/libm020 `StarterFunc` start with `jsr _geta4` (RELOC32); the plain build is byte-for-byte as before. The async cancel handler is compiled out (`USE_ASYNC_CANCEL` is off), so there is no other entry exec calls.
+`StarterFunc`, every thread's `NP_Entry`, ran with no a4. The first version called crt0's `_geta4`, which is wrong for `-resident`/`-resident32` (data per invocation; nrcrt0 has no usable `_geta4`). Now, under `__baserel__`, `pthread_create` saves its own a4 and the thread's id in the ThreadInfo (which never moves) and passes the ThreadInfo in `NP_Input`; `StarterFunc` reads it through `*(struct ExecBase **)4` → `ThisTask` → `pr_CIS`, reads no global, loads a4 (`moveal a2,a4`), puts the id back in `pr_CIS` and tail-calls the body. objdump (libb32/libm020): `moveal 4,a0; moveal a0@(276),a0; moveal a0@(156),a1; moveal a1@(20),a2; moveal a2,a4; movel a1@(24),a0@(156)`, and `pthread_create` does `movel a4,a3@(20)`. The plain build is unchanged. (`__saveds` does nothing on this stove: an empty `__saveds` function is a bare `rts` under `-fbaserel`.) `USE_ASYNC_CANCEL` is off, so there is no other entry exec calls.
 
 Lab, with libnix 0007, libpthread 0005 and libos32compat built base-relative:
 
@@ -208,3 +208,6 @@ Lab, with libnix 0007, libpthread 0005 and libos32compat built base-relative:
 | --- | --- |
 | t3_threads -fbaserel32 | `t3 OK`, rc 0 |
 | t3_threads -fbaserel | `t3 OK`, rc 0 |
+| t3_threads -resident32 | `t3 OK`, rc 0 |
+| t3_threads -resident | `t3 OK`, rc 0 |
+| t3_threads -resident32, `Resident … PURE`, two `Run`s at once | both `t3 OK`, rc 0 |
