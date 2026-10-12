@@ -1,0 +1,39 @@
+pthreads: a new thread loads the program's a4 in a base-relative build
+
+CreateNewProc starts the new process at StarterFunc with whatever a4 exec
+leaves, so in a program built -fbaserel or -fbaserel32 every global the
+thread read (SysBase first) came from the wrong place, and the program hung
+as soon as it started a thread. Under __baserel__, StarterFunc now calls the
+startup code's geta4 first and then runs the body, a separate function, so
+nothing reads data before a4 is right. A plain build is unchanged.
+
+On daletop, t3_threads built -fbaserel32 and -fbaserel (libnix 0007 and a
+base-relative libos32compat) prints "t3 OK" and returns 0; before, both hung.
+
+GPL-3.0-or-later. Copyright (c) 2026 Dalsin Limited.
+---
+diff --git a/pthreads/pthread.c b/pthreads/pthread.c
+index 1c07654..5c0174e 100644
+--- a/pthreads/pthread.c
++++ b/pthreads/pthread.c
+@@ -1412,7 +1412,20 @@ AROS_UFH3S(ULONG, CancelHandler,
+ }
+ #endif
+ 
++#ifdef __baserel__
++// The new process starts with no a4 of its own. In a base-relative program
++// (-fbaserel, -fbaserel32) the startup code's geta4 loads the program's a4
++// before anything reads data; the body is a separate function so that GCC
++// cannot touch a4 data before that.
++static void StarterBody(void) __attribute__((noinline));
+ static void StarterFunc(void) {
++	__asm__ volatile ("jsr _geta4" : : : "memory");
++	StarterBody();
++}
++static void StarterBody(void) {
++#else
++static void StarterFunc(void) {
++#endif
+ 	ThreadInfo *inf;
+ 	void *ret;
+ 	pthread_t pid;
