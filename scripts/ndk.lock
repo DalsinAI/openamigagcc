@@ -2,4 +2,4 @@
 # It is not free software: CI downloads it at build time and never keeps it,
 # publishes it or puts it in a release. "unpinned" makes CI print the archive's
 # sha256 with a warning instead of checking it.
-NDK3.2.lha  https://aminet.net/dev/misc/NDK3.2.lha  unpinned
+NDK3.2.lha  https://aminet.net/dev/misc/NDK3.2.lha  96cabd4ad683dced632e147bf86dee0f50dcb1254386216c25c362916a6409bb
