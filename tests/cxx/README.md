@@ -14,3 +14,11 @@ m68k-amigaos-g++ -m68020 -m68881 -O2 -fomit-frame-pointer -std=gnu++23 -o dtors 
 | second, printed at exit | `dtors OK` | `dtors FAILED: g (want tm b g a )` |
 
 It returns 0 when the thread's `thread_local` was destroyed in time, and 20 otherwise.
+
+## lean.cpp
+
+`lean-check.sh` compiles `lean.cpp` with the lean C++ library profile ([docs/lean-cxx.md](../../docs/lean-cxx.md)) and fails if the object needs exception or RTTI support, a static constructor, a guarded function-local static or libstdc++'s `operator new`. It only compiles, so it needs no Amiga:
+
+```bash
+CXX=m68k-amigaos-g++ NM=m68k-amigaos-nm tests/cxx/lean-check.sh
+```

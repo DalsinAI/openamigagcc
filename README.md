@@ -31,6 +31,8 @@ Each fix comes with a small reproducer that is wrong on the old compiler and rig
 
 C++ destructors are registered the C++ ABI's way (`-fuse-cxa-atexit`, patch 0010): `thread_local` destructors run, and static objects are destroyed in the reverse order of construction, interleaved with `atexit()` functions. `-fno-use-cxa-atexit` gives the old way back.
 
+The Open family's libraries and apps use a lean C++ (no exceptions, no RTTI, no static constructors in libraries, C at each library's entry points): [docs/lean-cxx.md](docs/lean-cxx.md). `tests/cxx/lean-check.sh` checks a build against it.
+
 The driver adds two safe defaults, each of which a build can turn back on with the positive option: `-fno-delete-null-pointer-checks` and `-fno-malloc-memset-to-calloc`. Loop distribution stays on (patch 0009): with the memmove fix it is correct, and a shift or insert loop that becomes one block move runs several times faster than the loop. A library that defines its own `memcpy`, `memmove`, `memset` or `calloc` as a loop builds with `-fno-tree-loop-distribute-patterns` (libnix's build does), or the loop becomes a call to itself.
 
 ## Mixing compilers
