@@ -4,13 +4,14 @@
 # throws and catches by type, linked -fbaserel32, -resident32 and -fbaserel,
 # print no "out of range" relocations, and the base-relative libstdc++ and
 # libsupc++ hold no LDFCM typeinfo pools (the PC-relative indirect EH data
-# that crossed hunks). Running catch.cpp needs an Amiga (the lab).
+# that crossed hunks). Running catch.cpp needs an Amiga (the lab). C++ with
+# exceptions links -lpthread: libstdc++'s eh_globals and libgcc's unwinder use it.
 # GPL-3.0-or-later, like the patches it goes with. Copyright (c) 2026 Dalsin Limited.
 set -u
 P=$1; CXX="$P/bin/m68k-amigaos-g++"; OBJDUMP="$P/bin/m68k-amigaos-objdump"
 D=$(cd "$(dirname "$0")" && pwd); O=$(mktemp -d); bad=0
 for m in -fbaserel32 -resident32 -fbaserel; do
-  if ! "$CXX" -m68020 -O2 $m -o "$O/catch$m" "$D/catch.cpp" > "$O/catch$m.log" 2>&1; then
+  if ! "$CXX" -m68020 -O2 $m -o "$O/catch$m" "$D/catch.cpp" -lpthread > "$O/catch$m.log" 2>&1; then
     echo "$m: WRONG (did not link)"; sed 's/^/  /' "$O/catch$m.log" | head -20; bad=1
   elif n=$(grep -c 'out of range' "$O/catch$m.log"); [ "$n" != 0 ]; then
     echo "$m: WRONG ($n 'out of range' lines)"; grep -m3 'out of range' "$O/catch$m.log"; bad=1
