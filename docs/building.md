@@ -50,6 +50,17 @@ no network at all, so a missing source stops it.
 Then `tests/repro/prove.sh PREFIX/bin` runs every reproducer (it needs
 `qemu-m68k`).
 
+## CI
+
+`.github/workflows/build.yml` does all of this on every pull request and every
+push to `main`: `fetch.sh`, then `scripts/fetch-ndk.sh` downloads `NDK3.2.lha`
+from Aminet and checks it against `scripts/ndk.lock` (CI only: the NDK is
+never kept here or put in a release), then `build.sh`, `prove.sh` (plain and
+with `-fno-tree-loop-distribute-patterns`), `tests/cxx/lean-check.sh`, and a
+compile of the tests that need a real AmigaOS to run (`tests/cxx`,
+`tests/pthreads`, `tests/libnix/setlocale_threads.c`). Running those stays a
+lab job.
+
 ## Using it
 
 Programs are AmigaOS 3.x hunk executables linked with libnix:
