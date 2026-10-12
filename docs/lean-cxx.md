@@ -32,7 +32,7 @@ An app that needs exceptions or `dynamic_cast` (a port that uses them, such as a
 
 ## Not yet working
 
-- **Base-relative C++.** A C++ program built with `-fbaserel32` and threads hangs, and a `-fbaserel` C++ program doesn't link (amigachrome-stoves `os32-gcc16/README.md`). Libraries that need base-relative data stay C until this is fixed.
+- **Catching an exception by type in base-relative C++.** With libnix 0007 and aros-stuff 0005, `-fbaserel` and `-fbaserel32` C++ programs link, start and run threads (`tests/baserel`), but their exception tables still point at typeinfo PC-relative across hunks (the linker's "out of range" lines), so a `catch` by type may not match. Base-relative libraries keep `-fno-exceptions` (they do anyway) until the GCC fix lands.
 - **64-bit atomics on the 68020-68040** call libatomic. In a library, use 32-bit atomics or exec's `Forbid`/`Permit` or a semaphore.
 
 ## Checking a build
