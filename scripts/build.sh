@@ -75,6 +75,10 @@ grep -aE '(make|install) [a-z0-9 ]*\.\.\.(done|failed)' "$LOGS/make.log" | sed '
 for d in binutils/_done gcc/_done libnix/_done libpthread/_done; do
   [ -f "$WORK/build-Linux-m68k-amigaos/$d" ] || { echo "the amiga-gcc build stopped at ${d%/_done} (see $LOGS/make.log and $WORK/log)"; exit 1; }
 done
+# gprof, ndk and ndk13 leave no _done marker: check what they install.
+for f in bin/m68k-amigaos-gprof m68k-amigaos/ndk-include/exec/types.h m68k-amigaos/ndk13-include/exec/types.h; do
+  [ -e "$PREFIX/$f" ] || { echo "the amiga-gcc build did not install $f (see $LOGS/make.log and $WORK/log)"; exit 1; }
+done
 
 # 6. libgcc, libstdc++ and the other target libraries, against libnix's
 #    headers, so libstdc++'s configure sees C99 maths, dirent and chdir.
