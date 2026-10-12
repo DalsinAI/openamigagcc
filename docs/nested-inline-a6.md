@@ -39,7 +39,13 @@ already evaluate the arguments first and are not affected.
 The A6 line moves after the argument temporaries, as AmigaPorts sfdc did on 6
 September 2026 (3332a96, "MacroGCC: bind the base register after evaluating
 the arguments"). The script changes sfdc's `MacroGCC.pl` and the `sfdc`
-script built from it. Given headers sfdc already made, it moves the same line
+script built from it.
+
+At the sfdc commit the recipe pins (db0b1d8), `MacroGCC.pl` already has the
+fix, but the generated `sfdc` script checked in beside it does not, and that
+script is the one amiga-gcc installs and runs to make the NDK's headers. The
+CI build of this fix shows both: `MacroGCC.pl: already binds A6 after the
+arguments`, `sfdc: A6 now bound after the arguments`. Given headers sfdc already made, it moves the same line
 in each macro, which fixes an installed toolchain without a rebuild:
 
 ```sh
