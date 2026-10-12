@@ -18,4 +18,6 @@ export PATH="$PREFIX/bin:$PATH"
 make -C "$SRC" ndk ndk13 netinclude PREFIX="$PREFIX" NDK=3.2
 # Roadshow's socket inlines, made acceptable to GCC 16 (docs/netinclude-inline-clobbers.md)
 python3 "$HERE/fix_inline_clobbers.py" "$PREFIX"/m68k-amigaos/ndk-include/inline/*.h
+# A6 bound after the arguments, so nested inline calls get the right base (docs/nested-inline-a6.md)
+python3 "$HERE/fix_sfdc_base_order.py" "$PREFIX"/m68k-amigaos/ndk-include/inline/*.h
 echo "NDK 3.2 installed in $PREFIX/m68k-amigaos"

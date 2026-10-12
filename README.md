@@ -17,6 +17,7 @@ It builds on bebbo's amiga-gcc line (GCC for `m68k-amigaos` with libnix) and add
 | Loop distribution off by default (patch 0006) made shift-up and sorted-insert loops 3.8 and 1.3 times slower on the AC090 | GCC driver default | fixed: on again ([docs](docs/loop-distribution.md)) |
 | `-resident32` alone links the plain `libm020` libraries | GCC multilib setup | fixed ([docs](docs/resident32-multilib.md)) |
 | A 64-bit libcall argument pushed from a stack slot reads the wrong word (`-m68040`/`-m68060` tuning) | GCC m68k back end | fixed ([docs](docs/push64-stack-slot.md)) |
+| A library call nested in another's arguments, as in `Stricmp(FilePart(x), ...)`, runs the outer call with the inner library's base in A6 | sfdc (the NDK's `inline/*.h`) | fixed by the recipe ([docs](docs/nested-inline-a6.md)) |
 | Roadshow's socket inlines are refused by GCC 16 (argument registers in the clobber list) | amiga-netinclude headers | fixed by the recipe ([docs](docs/netinclude-inline-clobbers.md)) |
 | `__stack` doesn't give a program its stack; the stack swap clobbers A2 (80000004) | libnix | fixed: `patches/libnix/0001` ([docs](docs/libnix-stack-swap.md)) |
 | Plain `-fbaserel32` programs never return to the Shell (they return the stack size) | libnix start code | fixed: `patches/libnix/0002` ([docs](docs/libnix-baserel32-exit.md)) |
