@@ -20,6 +20,7 @@ for v in old new; do
   ./cc.sh $L $O/exit5-b32-$v -fbaserel32 -m68020 -O2 -DEXIT=5 empty.c
   ./cc.sh $L $O/rc7-plain-$v -m68020 -O2 -DRC=7 empty.c
   ./cc.sh $L $O/utilbase-$v  -m68000 -O2 utilbase.c
+  ./cc.sh $L $O/setlocale-$v -m68020 -m68881 -O2 setlocale_threads.c -lpthread -lm
   N=$L/m68k-amigaos/libnix/lib
   $GP/bin/m68k-amigaos-gcc -B$N/ -nodefaultlibs -mcrt=nix13 -m68020 -O2 -fno-delete-null-pointer-checks \
     -DNAME="\"stk-n13-$v\"" stackdeep.c -o $O/stk-n13-$v \
