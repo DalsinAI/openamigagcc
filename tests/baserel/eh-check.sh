@@ -1,30 +1,19 @@
 #!/bin/bash
 # eh-check.sh PREFIX
-# Static check of patches/gcc/0011 (EH data always absolute): a throw and a
-# catch by type, linked -fbaserel32, -resident32 and -fbaserel,
+# Static check of patches/gcc/0011 (EH data always absolute): catch.cpp's
+# throws and catches by type, linked -fbaserel32, -resident32 and -fbaserel,
 # print no "out of range" relocations, and the base-relative libstdc++ and
 # libsupc++ hold no LDFCM typeinfo pools (the PC-relative indirect EH data
-# that crossed hunks). Running it is catch.cpp's job, on an Amiga.
+# that crossed hunks). Running catch.cpp needs an Amiga (the lab).
 # GPL-3.0-or-later, like the patches it goes with. Copyright (c) 2026 Dalsin Limited.
 set -u
 P=$1; CXX="$P/bin/m68k-amigaos-g++"; OBJDUMP="$P/bin/m68k-amigaos-objdump"
-O=$(mktemp -d); bad=0
-cat > "$O/eh.cpp" <<'CXX'
-#include <stdexcept>
-#include <vector>
-struct Mine { int v; };
-int main() {
-  int got = 0;
-  try { throw Mine{7}; } catch (const Mine &m) { got += m.v; }
-  try { std::vector<int> v; v.at(3); } catch (const std::out_of_range &) { got += 1; }
-  return got == 8 ? 0 : 1;
-}
-CXX
+D=$(cd "$(dirname "$0")" && pwd); O=$(mktemp -d); bad=0
 for m in -fbaserel32 -resident32 -fbaserel; do
-  if ! "$CXX" -m68020 -O2 $m -o "$O/eh$m" "$O/eh.cpp" > "$O/eh$m.log" 2>&1; then
-    echo "$m: WRONG (did not link)"; sed 's/^/  /' "$O/eh$m.log" | head -20; bad=1
-  elif n=$(grep -c 'out of range' "$O/eh$m.log"); [ "$n" != 0 ]; then
-    echo "$m: WRONG ($n 'out of range' lines)"; grep -m3 'out of range' "$O/eh$m.log"; bad=1
+  if ! "$CXX" -m68020 -O2 $m -o "$O/catch$m" "$D/catch.cpp" > "$O/catch$m.log" 2>&1; then
+    echo "$m: WRONG (did not link)"; sed 's/^/  /' "$O/catch$m.log" | head -20; bad=1
+  elif n=$(grep -c 'out of range' "$O/catch$m.log"); [ "$n" != 0 ]; then
+    echo "$m: WRONG ($n 'out of range' lines)"; grep -m3 'out of range' "$O/catch$m.log"; bad=1
   else echo "$m: right (links with no 'out of range' lines)"; fi
 done
 n=0
