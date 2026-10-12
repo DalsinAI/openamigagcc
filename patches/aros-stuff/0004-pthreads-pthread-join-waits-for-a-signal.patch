@@ -1,0 +1,64 @@
+pthreads: pthread_join waits for a signal, and leaves its priority alone
+
+pthread_join waited for the thread's end in a loop of sched_yield, and
+lowered then raised its own task's tc_Node.ln_Pri by hand around each one,
+with no Forbid and without SetTaskPri, while the task was in the ready list.
+That busy-waits the CPU and can leave the list out of order.
+
+The joiner now records itself in the ThreadInfo (joiner) and Waits for
+SIGF_PARENT, which the thread's end already sends its parent; it now sends it
+to the joiner too when that is another task. The signal is cleared under
+thread_sem before finished is read, so a signal sent after that read is still
+pending at Wait, and a stray one (Ctrl-F) only goes round the loop again.
+
+GPL-3.0-or-later. Copyright (c) 2026 Dalsin Limited.
+---
+diff --git a/pthreads/pthread.c b/pthreads/pthread.c
+index e320903..1c07654 100644
+--- a/pthreads/pthread.c
++++ b/pthreads/pthread.c
+@@ -104,6 +104,7 @@ typedef struct {
+ 	void* (*start)(void*);
+ 	void *arg;
+ 	struct Task *parent;
++	struct Task *joiner;
+ 	struct Task *task;
+ 	void *ret;
+ 	pthread_attr_t attr;
+@@ -1537,6 +1538,8 @@ static void StarterFunc(void) {
+ 	inf->task = (struct Task *)-1;
+ 	ReleaseSemaphore(&thread_sem);
+ 	Signal(inf->parent, SIGF_PARENT);
++	if (inf->joiner && inf->joiner != inf->parent)
++		Signal(inf->joiner, SIGF_PARENT);
+ }
+ 
+ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void* (*start)(void*), void *arg) {
+@@ -1686,20 +1689,17 @@ int pthread_join(pthread_t thread, void **value_ptr) {
+ 		return EINVAL;
+ 	}
+ 
+-	// busy yield loop...
++	// wait for the thread's end: it signals its parent and its joiner (SIGF_PARENT) once
++	// finished is set. The signal is cleared under thread_sem before finished is read,
++	// so one sent after that read is still pending at Wait.
++	inf->joiner = task;
+ 	while (!inf->started || !inf->finished) {
++		SetSignal(0, SIGF_PARENT);
++		if (inf->started && inf->finished)
++			break;
+ 		ReleaseSemaphore(&thread_sem);
+-		D(bug("waiting for %ld to start...\n", thread));
+-		--task->tc_Node.ln_Pri;
+-		sched_yield();
+-		++task->tc_Node.ln_Pri;
+-
+-#if 0
+-		// TODO add proper signal waiting - but some that works from any task
+ 		D(bug("%s waiting for signal (%ld, inf=%8lx, fini=%ld)\n", __FUNCTION__, thread, inf, (int)inf->finished));
+ 		Wait(SIGF_PARENT);
+-#endif
+-
+ 		ObtainSemaphore(&thread_sem);
+ 		inf = GetThreadInfo(thread);
+ 	}
