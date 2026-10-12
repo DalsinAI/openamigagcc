@@ -39,6 +39,12 @@ for opt in -O1 -O2 -Os; do
   "$CXX" -m68020 $opt "$@" -fno-exceptions -c "$D/copyback.cpp" -o "$O/copyback.o" && image copyback && echo -n "[$opt] " && run copyback copy_backward || built "[$opt] copy_backward"
 done
 
+# a nested inline library call, Stricmp(FilePart(x), ...), with the NDK's own inline headers
+NDKINC="-isystem $B/../m68k-amigaos/ndk-include"
+for opt in -O1 -O2 -Os; do
+  "$CC" -m68020 $opt "$@" $NDKINC -c "$D/nested.c" -o "$O/nested.o" && image nested && echo -n "[$opt] " && run nested nested || built "[$opt] nested"
+done
+
 # 68000: byte copies when the alignment is unknown, and odd sizes backwards
 for opt in -O2 -Os; do
   "$CC" -m68000 $opt "$@" -c "$D/shift.c" -o "$O/shift.o" && image shift -m68000 && echo -n "[$opt -m68000] " && run shift shift m68000 || built "[$opt -m68000] shift"
