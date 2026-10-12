@@ -1,0 +1,66 @@
+pthreads: __sync_val_compare_and_swap returns the old value, as GCC's builtin
+
+On m68k pthread.c defines __sync_val_compare_and_swap itself, under Disable().
+It returned the new value when the swap was made and the expected value when
+it was not, so a caller could not tell what was there. Its three callers in
+this file (pthread_spin_lock and pthread_spin_trylock) were written for that.
+
+It now returns the value that was there, like GCC's builtin and every other
+compiler's, and the spinlocks test for != 0 (the lock was held). The MorphOS
+branch of pthread_spin_lock, which uses the real builtin, was inverted the
+same way and is right now too.
+
+GPL-3.0-or-later. Copyright (c) 2026 Dalsin Limited.
+---
+diff --git a/pthreads/pthread.c b/pthreads/pthread.c
+index d547974..e320903 100644
+--- a/pthreads/pthread.c
++++ b/pthreads/pthread.c
+@@ -180,15 +180,15 @@ static pthread_t GetThreadId(struct Task *task) {
+ static int __m68k_sync_val_compare_and_swap(int *v, int o, int n)
+ {
+ 	volatile int * vv = (volatile int *)v;
++	int old;
+ 
++	// as GCC's builtin: the value that was there, so the swap was made when it equals o
+ 	Disable();
+-	if (*vv == o) {
++	old = *vv;
++	if (old == o)
+ 		*vv = n;
+-		Enable();
+-		return n;
+-	}
+ 	Enable();
+-	return o;
++	return old;
+ }
+ #undef __sync_val_compare_and_swap
+ #define __sync_val_compare_and_swap(v, o, n) __m68k_sync_val_compare_and_swap(v, o, n)
+@@ -1209,7 +1209,7 @@ int pthread_spin_lock(pthread_spinlock_t *lock) {
+ #ifdef __MORPHOS__
+ 	{
+ 	unsigned int cnt = 0;
+-	while (__sync_val_compare_and_swap((int *)lock, 0, 1) == 0)
++	while (__sync_val_compare_and_swap((int *)lock, 0, 1) != 0)
+ 	{
+ 		asm volatile("" ::: "memory");
+ 		if ((cnt++ & 255) == 0)
+@@ -1217,7 +1217,7 @@ int pthread_spin_lock(pthread_spinlock_t *lock) {
+ 	}
+ 	}
+ #else
+-	while (__sync_val_compare_and_swap((int*) lock, 0, 1) == 0)
++	while (__sync_val_compare_and_swap((int*) lock, 0, 1) != 0)
+ 		sched_yield(); // TODO: don't yield the CPU every iteration
+ 					   // SBF: if yield is implemented correctly there's nothing else to do.
+ #endif
+@@ -1231,7 +1231,7 @@ int pthread_spin_trylock(pthread_spinlock_t *lock) {
+ 	if (lock == NULL)
+ 		return EINVAL;
+ 
+-	if (__sync_val_compare_and_swap((int*) lock, 0, 1) == 0)
++	if (__sync_val_compare_and_swap((int*) lock, 0, 1) != 0)
+ 		return EBUSY;
+ 
+ 	return 0;
