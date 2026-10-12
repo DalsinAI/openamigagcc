@@ -6,7 +6,7 @@ It builds on bebbo's amiga-gcc line (GCC for `m68k-amigaos` with libnix) and add
 
 ## Status
 
-**16.2.0-open2, 12 October 2026** ([notes](docs/releases/16.2.0-open2.md), [install](docs/install.md)): every fix below. `16.2.0-open1` (9 October 2026) has the fixes up to libnix 0003.
+**16.2.0-open2, 12 October 2026** ([notes](docs/releases/16.2.0-open2.md), [install](docs/install.md)): every fix below. `16.2.0-open1` (9 October 2026) has GCC patches 0001-0009, libnix 0001-0003 and the two header fixes; the thread, C++ and nested-call fixes are new in open2.
 
 | Bug | Where | Status |
 | --- | --- | --- |
