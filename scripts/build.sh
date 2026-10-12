@@ -49,6 +49,10 @@ cp "$HERE"/sys-include/*.h "$WORK/sys-include/"
 # beside the NDK's) clobber registers their arguments sit in; GCC 16 refuses
 # that. Make those registers dummy outputs (idempotent).
 python3 "$HERE/scripts/fix_inline_clobbers.py" "$WORK"/projects/amiga-netinclude/include/inline/*.h
+# sfdc's GCC inlines (the NDK's inline/*.h are made with it) bound A6 before
+# evaluating the arguments, so Stricmp(FilePart(x), ...) ran with DOSBase in A6.
+# Bind it after them (idempotent; stops if the code is not as expected).
+python3 "$HERE/scripts/fix_sfdc_base_order.py" "$WORK"/projects/sfdc/MacroGCC.pl "$WORK"/projects/sfdc/sfdc
 
 # 3. The NDK, from you.
 mkdir -p "$WORK/download"
