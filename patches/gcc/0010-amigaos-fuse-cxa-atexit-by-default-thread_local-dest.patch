@@ -1,0 +1,49 @@
+From 4e57901b0afbd3265e73cf2140dcc70665d6fa17 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Mon, 12 Oct 2026 08:40:00 +0100
+Subject: [PATCH] amigaos: -fuse-cxa-atexit by default (thread_local
+ destructors run)
+
+default_use_cxa_atexit=yes for m68k*-*-amigaos*, so cc1plus starts with
+flag_use_cxa_atexit set (DEFAULT_USE_CXA_ATEXIT).
+
+With -fno-use-cxa-atexit GCC never registers the destructor of a
+thread_local at namespace scope or a static data member: handle_tls_init()
+registers destructors only when flag_use_cxa_atexit is set, and there is
+no destruction pass for thread-local storage. A plain m68k-amigaos-g++
+build ran none of them, in a thread or in the main program. (A
+thread_local inside a function was registered either way.)
+
+With it, a static object's destructor is registered with
+__cxa_atexit(dtor, obj, &__dso_handle) when the object is constructed,
+and a thread_local's with libstdc++'s __cxa_thread_atexit(). Static
+destructors then run in the reverse order of construction, interleaved
+with atexit() functions, as C++ requires; before, they ran from
+__DTOR_LIST__ after every atexit() function.
+
+libnix provides __cxa_atexit and __dso_handle (openamigagcc
+patches/libnix/0005); this patch needs it. -fno-use-cxa-atexit turns
+the old way back on.
+---
+ gcc/config.gcc | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/gcc/config.gcc b/gcc/config.gcc
+index 51b9ee119..6cf034acd 100644
+--- a/gcc/config.gcc
++++ b/gcc/config.gcc
+@@ -2508,6 +2508,11 @@ m68k*-*-amigaos*)
+ 	extra_options="${extra_options} m68k/amigaos.opt"
+ 	extra_gcc_objs="driver-amigaos.o"
+ 	gnu_ld=yes
++	# OpenAmigaGCC: -fuse-cxa-atexit by default. GCC then registers every
++	# static and thread_local destructor (__cxa_atexit, __cxa_thread_atexit);
++	# without it a thread_local's destructor never runs. libnix provides
++	# __cxa_atexit and __dso_handle (openamigagcc patches/libnix/0005).
++	default_use_cxa_atexit=yes
+ 	CFLAGS="-Os"
+   	case ${enable_threads} in
+ 	    yes | posix) thread_file='posix' ;;
+-- 
+2.53.0
+

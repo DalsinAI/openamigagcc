@@ -1,0 +1,114 @@
+From 268a38bc17bc817cd666888e8ffb3da795ce4155 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Mon, 12 Oct 2026 08:32:35 +0100
+Subject: [PATCH] __cxa_atexit and __dso_handle: C++ destructors registered the
+ standard way
+
+OpenAmigaGCC's GCC defaults to -fuse-cxa-atexit for m68k-amigaos (gcc
+patch 0010), so that thread_local destructors run. Code built so calls
+__cxa_atexit(dtor, obj, &__dso_handle) for every static object with a
+destructor; libnix had neither symbol.
+
+- atexit.c: __cxa_atexit() joins atexit() on the same list, so exit()
+  calls both kinds in the reverse order of registration. The list is
+  taken from its head while exit() runs it, so a function registered
+  during exit (a static first used in a destructor) runs too. A node is
+  added under Forbid(): threads may register at the same time.
+- __dso_handle.c: the program's handle, an archive member of its own, so
+  a program that defines __dso_handle itself still links.
+---
+ sources/nix/misc/__dso_handle.c |  7 +++++
+ sources/nix/stdlib/atexit.c     | 45 +++++++++++++++++++++++++--------
+ 2 files changed, 41 insertions(+), 11 deletions(-)
+ create mode 100644 sources/nix/misc/__dso_handle.c
+
+diff --git a/sources/nix/misc/__dso_handle.c b/sources/nix/misc/__dso_handle.c
+new file mode 100644
+index 0000000..bf659ce
+--- /dev/null
++++ b/sources/nix/misc/__dso_handle.c
+@@ -0,0 +1,7 @@
++/* __dso_handle: the C++ ABI's handle for this program image. GCC passes its
++   address to __cxa_atexit() and __cxa_thread_atexit() for every static or
++   thread_local object with a destructor (-fuse-cxa-atexit, OpenAmigaGCC's
++   default for m68k-amigaos). Only its address matters. It is an archive
++   member of its own, so a program that defines __dso_handle itself still
++   links. */
++void *__dso_handle = 0;
+diff --git a/sources/nix/stdlib/atexit.c b/sources/nix/stdlib/atexit.c
+index c7ca576..ff5865b 100644
+--- a/sources/nix/stdlib/atexit.c
++++ b/sources/nix/stdlib/atexit.c
+@@ -1,35 +1,58 @@
+ #include <stdlib.h>
+ #include <errno.h>
++#include <proto/exec.h>
+ #include "stabs.h"
+ #include "stdio.h"
+ 
++/* One list for atexit() and __cxa_atexit(), so exit() calls the functions
++   in the reverse order of their registration whichever way they were
++   registered, as C and C++ require. A function registered while exit() runs
++   the list (a static object first used in a destructor) is called too. */
+ struct atexitnode
+ { 
+   struct atexitnode *next;
+-  void (*func)(void);
++  void (*func)(void);        /* from atexit() */
++  void (*cxafunc)(void *);   /* from __cxa_atexit() */
++  void *arg;
+ };
+ 
+ static struct atexitnode *__funclist=NULL; /* List of functions to call at exit */
+ 
+-int atexit(void (*func)(void))
++static int __addexit(void (*func)(void), void (*cxafunc)(void *), void *arg)
+ { 
+   struct atexitnode *node;
+   if((node=(struct atexitnode *)malloc(sizeof(struct atexitnode)))==NULL)
+   { errno=ENOMEM;
+     return -1; }
+-  else
+-  { node->next=__funclist;
+-    node->func=func;
+-    __funclist=node;
+-    return 0; }
++  node->func=func;
++  node->cxafunc=cxafunc;
++  node->arg=arg;
++  Forbid(); /* threads may register at the same time */
++  node->next=__funclist;
++  __funclist=node;
++  Permit();
++  return 0;
+ }
+ 
++int atexit(void (*func)(void))
++{ return __addexit(func,NULL,NULL); }
++
++/* The C++ ABI's registration of a static object's destructor: GCC calls it
++   with -fuse-cxa-atexit, OpenAmigaGCC's default for m68k-amigaos. A program
++   is one image, so dso (&__dso_handle) needs no bookkeeping. */
++int __cxa_atexit(void (*func)(void *), void *arg, void *dso)
++{ (void)dso;
++  return __addexit(NULL,func,arg); }
++
+ void __exitatexit(void)
+ {
+-  struct atexitnode *thisf=__funclist;
+-  while(thisf!=NULL)
+-  { (*thisf->func)();
+-    thisf=thisf->next; }
++  struct atexitnode *thisf;
++  while((thisf=__funclist)!=NULL)
++  { __funclist=thisf->next;
++    if(thisf->cxafunc!=NULL)
++      (*thisf->cxafunc)(thisf->arg);
++    else
++      (*thisf->func)(); }
+ }
+ 
+ ADD2EXIT(__exitatexit,0);
+-- 
+2.53.0
+
