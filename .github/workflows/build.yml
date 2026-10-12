@@ -70,4 +70,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: logs
-          path: ${{ env.WORK }}/openamigagcc-logs
+          path: |
+            ${{ env.WORK }}/openamigagcc-logs
+            ${{ env.WORK }}/log
