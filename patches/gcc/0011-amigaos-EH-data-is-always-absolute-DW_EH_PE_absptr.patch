@@ -1,0 +1,43 @@
+From fa3b76c171ddd5cbd438c51edd6485c72b22dc73 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Mon, 12 Oct 2026 12:05:10 +0100
+Subject: [PATCH] amigaos: EH data is always absolute (DW_EH_PE_absptr)
+
+m68k.h's ASM_PREFERRED_EH_DATA_FORMAT picks DW_EH_PE_pcrel, with
+DW_EH_PE_indirect for global references, whenever flag_pic is set, and
+-fbaserel, -fbaserel32, -resident and -resident32 set it. The indirect
+references go through per-unit .data.rel.local.LDFCM* pools, and
+.gcc_except_table reaches them with 32-bit PC-relative relocations from one
+hunk to another, which the hunk format cannot express: every base-relative
+C++ link printed "reloc for .data.rel.local.LDFCM0 is out of range" and the
+type table held garbage, so catch by type could not match.
+
+On AmigaOS the EH data is now always DW_EH_PE_absptr, which RELOC32
+relocates in every code model, as it already was in the absolute one.
+---
+ gcc/config/m68k/amigaos.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/gcc/config/m68k/amigaos.h b/gcc/config/m68k/amigaos.h
+index 183399f..caf5f6c 100644
+--- a/gcc/config/m68k/amigaos.h
++++ b/gcc/config/m68k/amigaos.h
+@@ -139,6 +139,15 @@ amiga_select_section (tree decl, int reloc ATTRIBUTE_UNUSED,
+ #define ALIGN_ASM_OP "\t.align\t"
+ #endif
+ 
++/* EH data (.eh_frame, .gcc_except_table) is always absolute on AmigaOS.
++   m68k.h picks DW_EH_PE_pcrel (and indirect for globals) when flag_pic, which
++   -fbaserel, -fbaserel32, -resident and -resident32 set; but a PC-relative
++   reference from the except table to a typeinfo pointer in a data hunk
++   crosses hunks, which the hunk format cannot express ("reloc ... out of
++   range"). RELOC32 relocates an absolute pointer in every code model.  */
++#undef ASM_PREFERRED_EH_DATA_FORMAT
++#define ASM_PREFERRED_EH_DATA_FORMAT(CODE, GLOBAL) DW_EH_PE_absptr
++
+ /* GAS supports alignment up to 32768 bytes.  */
+ #undef ASM_OUTPUT_ALIGN
+ #define ASM_OUTPUT_ALIGN(FILE, LOG)					\
+-- 
+2.53.0
+
