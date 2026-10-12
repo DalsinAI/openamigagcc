@@ -13,6 +13,7 @@ git am /path/to/patches/libnix/*.patch      # or: patch -p1 < each file, in orde
 | `0003-nix20-math-…` | 32-bit multiply/divide jump through a NULL `UtilityBase` (80000004) | `docs/libnix-utilitybase.md` |
 | `0004-__initlibraries-…` | soft-float doubles rounded to single precision (or toward zero) on an FPU Amiga, after OS 3.2's IEEE libraries set FPCR on open | `docs/libnix-fpcr.md` |
 | `0005-__cxa_atexit-…` | no `__cxa_atexit` or `__dso_handle`, which C++ code built with `-fuse-cxa-atexit` (the compiler's default from gcc patch 0010) needs | `docs/cxa-atexit.md` |
+| `0006-setlocale-…` | `setlocale()` from several threads at once (libstdc++ calls it for every number a stream converts) frees the same name twice and closes the same locale twice; the saved name can't be set back | `docs/libnix-setlocale.md` |
 
 Then rebuild libnix (`make libnix` in amiga-gcc, or `Makefile.gcc6 all install`). Built with the GCC 16.2 stove at `-O2`, the unpatched source gives a `libnix20.a`, `libnix13.a` and start code byte-identical to the stove's.
 
