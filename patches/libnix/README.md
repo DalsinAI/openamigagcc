@@ -14,6 +14,7 @@ git am /path/to/patches/libnix/*.patch      # or: patch -p1 < each file, in orde
 | `0004-__initlibraries-…` | soft-float doubles rounded to single precision (or toward zero) on an FPU Amiga, after OS 3.2's IEEE libraries set FPCR on open | `docs/libnix-fpcr.md` |
 | `0005-__cxa_atexit-…` | no `__cxa_atexit` or `__dso_handle`, which C++ code built with `-fuse-cxa-atexit` (the compiler's default from gcc patch 0010) needs | `docs/cxa-atexit.md` |
 | `0006-setlocale-…` | `setlocale()` from several threads at once (libstdc++ calls it for every number a stream converts) frees the same name twice and closes the same locale twice; the saved name can't be set back | `docs/libnix-setlocale.md` |
+| `0007-cxxglue-__initcpp-…` | under `-fbaserel`/`-fbaserel32`, `__init_eh` and `__initcpp` addressed the `.list` sections (in the code hunk) from a4: `-fbaserel` C++ failed to link and `-fbaserel32` C++ hung before `main` | `tests/baserel/FINDINGS.md` |
 
 Then rebuild libnix (`make libnix` in amiga-gcc, or `Makefile.gcc6 all install`). Built with the GCC 16.2 stove at `-O2`, the unpatched source gives a `libnix20.a`, `libnix13.a` and start code byte-identical to the stove's.
 

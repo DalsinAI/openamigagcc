@@ -1,0 +1,74 @@
+From 5b624ba8e1b8661671edf12f16ab81bf3cb3e28c Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Mon, 12 Oct 2026 11:26:23 +0100
+Subject: [PATCH] cxxglue, __initcpp: the .list sections' addresses absolutely,
+ not from a4
+
+The linker script puts .list___EH_FRAME_BEGIN and the ctor/dtor lists in the
+code hunk. Under -fbaserel and -fbaserel32 GCC addressed them from a4, which
+in a base-relative program only reaches the data hunk: __init_eh read its
+frame list through a4 (DREL16 in libb, which no longer fits once .data is
+more than 32 KB from it, so -fbaserel C++ failed to link), and __initcpp
+computed its loop's end a4-relative even with __far (DREL32). A -fbaserel32
+C++ program hung at startup before main.
+
+Both now take the lists' addresses with lea, a RELOC32 to the code hunk in
+every multilib. On daletop, a C++ program with a std::vector and printf built
+-fbaserel32 and -fbaserel (stove-built libb/libb32 libnix with this patch,
+libos32compat built base-relative) prints its result and returns 0; with
+the old libnix it hangs.
+---
+ sources/nix/misc/__initcpp.c | 9 +++++++--
+ sources/nix/misc/cxxglue.c   | 6 +++++-
+ 2 files changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/sources/nix/misc/__initcpp.c b/sources/nix/misc/__initcpp.c
+index 876032e..7753d5d 100644
+--- a/sources/nix/misc/__initcpp.c
++++ b/sources/nix/misc/__initcpp.c
+@@ -6,16 +6,21 @@ typedef void (*func_ptr) (void);
+ extern __far func_ptr __CTOR_LIST__[];
+ extern __far func_ptr __DTOR_LIST__[];
+ 
++// The lists are in the code hunk: their addresses are taken absolutely, never from a4,
++// which in a base-relative program only reaches the data hunk (GCC made the loop's end
++// a4-relative under -fbaserel even with __far).
+ void __initcpp() {
+-  func_ptr *p0 = __CTOR_LIST__ + 1;
++  func_ptr *p0;
+   func_ptr *p;
++  __asm__("lea ___CTOR_LIST__+4,%0" : "=a"(p0));
+   for (p = p0; *p; p++);
+   while (p > p0)
+     (*--p)();
+ }
+ 
+ void __exitcpp() {
+-  func_ptr *p = __DTOR_LIST__ + 1;
++  func_ptr *p;
++  __asm__("lea ___DTOR_LIST__+4,%0" : "=a"(p));
+   while (*p)
+     (*p++)();
+ }
+diff --git a/sources/nix/misc/cxxglue.c b/sources/nix/misc/cxxglue.c
+index 1c2e416..9d79d88 100644
+--- a/sources/nix/misc/cxxglue.c
++++ b/sources/nix/misc/cxxglue.c
+@@ -11,9 +11,13 @@ __attribute((section(".dlist___EH_FRAME_OBJECT")))
+ void * _EH_FRAME_OBJECTS__[1] = {0};
+ 
+ void __init_eh() {
+-    void ** frame = (void **)_EH_FRAME_BEGINS__ + 1;
++    void ** frame;
+     void ** object = _EH_FRAME_OBJECTS__ + 1;
+ 
++    // .list___EH_FRAME_BEGIN is in the code hunk: its address is taken absolutely, never
++    // from a4, which in a base-relative program only reaches the data hunk.
++    __asm__("lea __EH_FRAME_BEGINS__+4,%0" : "=a"(frame));
++
+     while (*frame) {
+       __register_frame_info(*frame++, *object++);
+     }
+-- 
+2.53.0
+

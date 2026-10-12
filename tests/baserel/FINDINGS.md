@@ -171,3 +171,29 @@ From the failing t3-b16 link with `-Wl,-Map`:
 | -fbaserel32 | OK, 18 out-of-range lines | **hangs**, nothing printed |
 
 So the -fbaserel32 hang is not about threads: a C++ program with no threads hangs the same way.
+
+## Fix 1: libnix 0007 (cxxglue, __initcpp)
+
+`patches/libnix/0007`: `__init_eh` takes `_EH_FRAME_BEGINS__`'s address with `lea` (RELOC32), and so do `__initcpp`/`__exitcpp` for `__CTOR_LIST__`/`__DTOR_LIST__`. `__initcpp` had the same fault: its loop's end was computed a4-relative (`DREL32 ___CTOR_LIST__`) even with `__far`. After the patch, `objdump -r` shows no DREL against `.list___EH_FRAME_BEGIN`, `___CTOR_LIST__` or `___DTOR_LIST__` in libb, libb/libm020 and libb32/libm020. Built into a copy of the stove (`ar r` of those two members only, flags `-O2 -fomit-frame-pointer -fno-tree-loop-distribute-patterns` plus the multilib's, which reproduce the old members exactly).
+
+Lab (copy of Instance-32, clean start each run, 60 s):
+
+| Program | libnix | libos32compat | Result |
+| --- | --- | --- | --- |
+| nothreads -fbaserel32, no compat | old | none | hangs |
+| nothreads -fbaserel32, no compat | 0007 | none | `nothreads OK 328350`, rc 0 |
+| nothreads -fbaserel32 | 0007 | absolute (installed), no `--wrap` | `nothreads OK 328350`, rc 0 |
+| nothreads -fbaserel32 / -fbaserel | 0007 | absolute, with `--wrap=malloc…` | hangs |
+| nothreads -fbaserel32 | 0007 | **built -fbaserel32**, with `--wrap` | `nothreads OK 328350`, rc 0 |
+| t3_threads -fbaserel32 | 0007 | built -fbaserel32, with `--wrap` | **hangs** (no output; stdout is buffered) |
+
+`-fbaserel` C++ now links. Plain C (`printf`) with -fbaserel32 ran before and after.
+
+## Item 3: libos32compat is not safe in base-relative programs
+
+`objdump -dr libos32compat.a | grep -c a4@` gives 7, all in `os32compat_malloc.o`: absolute-model code uses **a4 as a scratch register** (`movel a4@(-12),d2`, `clrl a4@(-4)` …: a4 holds the block header there) and calls `__real_malloc`/`__real_free`, which in a base-relative program need a4 to be the data base. With `--wrap=malloc,…` every allocation goes through it, so the program hangs. It needs base-relative builds (libb, libb32 multilibs) like the other libraries; built `-fbaserel32`, the no-threads program runs.
+
+## Still open
+
+- **Threads under -fbaserel32** hang even with 0007 and a base-relative libos32compat. Likely the new tasks libpthread starts never load a4 (a base-relative task entry needs `geta4`); not checked yet.
+- **Fix 2 (GCC 0011, absptr EH data format)** not done: it needs a gcc and target-library rebuild, and the release rebuild is running on WorkingSpace. The "out of range" lines are still there (18 for nothreads, 25 for t3) with 0007.
