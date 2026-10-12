@@ -52,6 +52,9 @@ jobs:
       - name: Lean C++ check
         run: CXX="$PREFIX/bin/m68k-amigaos-g++" NM="$PREFIX/bin/m68k-amigaos-nm" tests/cxx/lean-check.sh
 
+      - name: Base-relative C++ exception data
+        run: tests/baserel/eh-check.sh "$PREFIX"
+
       - name: Compile the AmigaOS-only tests
         run: |
           set -e
