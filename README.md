@@ -23,6 +23,7 @@ It builds on bebbo's amiga-gcc line (GCC for `m68k-amigaos` with libnix) and add
 | A program's own `UtilityBase`, still NULL, crashes 32-bit multiply/divide (80000004) | libnix | fixed: `patches/libnix/0003` ([docs](docs/libnix-utilitybase.md)) |
 | Soft-float doubles (`-m68060`, or `-m68020` without `-m68881`) rounded to single precision on an Amiga with an FPU: OS 3.2's IEEE libraries set FPCR when libnix opens them | libnix start code | fixed: `patches/libnix/0004` ([docs](docs/libnix-fpcr.md)) |
 | A thread that was running when a later thread was created reads freed memory as it ends: C++ `thread_local` or `call_once` in several threads crashes (80000003, 80000006) or hangs | libpthread (aros-stuff) | fixed: `patches/aros-stuff/0001` ([docs](docs/pthreads-thread-table.md)) |
+| `pthread_detach` was a stub (`std::thread::detach` threw "No such process"); a detached thread's slot was never given back; `pthread_join` returned errors with its semaphore held, hanging the next pthread call | libpthread (aros-stuff) | fixed: `patches/aros-stuff/0002` (amigachrome-stoves' t19) |
 
 Each fix comes with a small reproducer that is wrong on the old compiler and right on the new one: `tests/repro/prove.sh` runs the GCC ones and libnix's FPCR one under `qemu-m68k`, the other libnix ones are in `tests/libnix/`, and the libpthread one is `tests/pthreads/t3race.cpp`. How to build: [docs/building.md](docs/building.md).
 
