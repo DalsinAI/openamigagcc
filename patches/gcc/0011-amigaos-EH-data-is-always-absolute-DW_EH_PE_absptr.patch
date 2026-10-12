@@ -1,4 +1,4 @@
-From fa3b76c171ddd5cbd438c51edd6485c72b22dc73 Mon Sep 17 00:00:00 2001
+From 6bfc6ba0bf87bc474adb084da5a6a4c74814bf5a Mon Sep 17 00:00:00 2001
 From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
 Date: Mon, 12 Oct 2026 12:05:10 +0100
 Subject: [PATCH] amigaos: EH data is always absolute (DW_EH_PE_absptr)
@@ -14,17 +14,18 @@ type table held garbage, so catch by type could not match.
 
 On AmigaOS the EH data is now always DW_EH_PE_absptr, which RELOC32
 relocates in every code model, as it already was in the absolute one.
+The override sits in m68kamigaos.h, the target's tm_file after m68k.h.
 ---
- gcc/config/m68k/amigaos.h | 9 +++++++++
+ gcc/config/m68k/m68kamigaos.h | 9 +++++++++
  1 file changed, 9 insertions(+)
 
-diff --git a/gcc/config/m68k/amigaos.h b/gcc/config/m68k/amigaos.h
-index 183399f..caf5f6c 100644
---- a/gcc/config/m68k/amigaos.h
-+++ b/gcc/config/m68k/amigaos.h
-@@ -139,6 +139,15 @@ amiga_select_section (tree decl, int reloc ATTRIBUTE_UNUSED,
- #define ALIGN_ASM_OP "\t.align\t"
- #endif
+diff --git a/gcc/config/m68k/m68kamigaos.h b/gcc/config/m68k/m68kamigaos.h
+index 8364a95f8..6d320c911 100644
+--- a/gcc/config/m68k/m68kamigaos.h
++++ b/gcc/config/m68k/m68kamigaos.h
+@@ -182,6 +182,15 @@ amiga_declare_object = 0
+ 
+ #define JUMP_TABLES_IN_TEXT_SECTION 1
  
 +/* EH data (.eh_frame, .gcc_except_table) is always absolute on AmigaOS.
 +   m68k.h picks DW_EH_PE_pcrel (and indirect for globals) when flag_pic, which
@@ -35,9 +36,9 @@ index 183399f..caf5f6c 100644
 +#undef ASM_PREFERRED_EH_DATA_FORMAT
 +#define ASM_PREFERRED_EH_DATA_FORMAT(CODE, GLOBAL) DW_EH_PE_absptr
 +
- /* GAS supports alignment up to 32768 bytes.  */
- #undef ASM_OUTPUT_ALIGN
- #define ASM_OUTPUT_ALIGN(FILE, LOG)					\
+ /* In m68k svr4, using swbeg is the standard way to do switch
+    table.  */
+ #undef ASM_OUTPUT_BEFORE_CASE_LABEL
 -- 
-2.53.0
+2.43.0
 
