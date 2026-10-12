@@ -1,0 +1,89 @@
+pthreads: a new thread gets its creator's a4 in a base-relative build
+
+CreateNewProc starts the new process at StarterFunc with whatever a4 exec
+leaves, so in a program built -fbaserel, -fbaserel32, -resident or
+-resident32 every global the thread read (SysBase first) came from the
+wrong place, and the program hung as soon as it started a thread.
+
+Under __baserel__, pthread_create saves its own a4 and the thread's id in
+the ThreadInfo (which never moves) and passes the ThreadInfo, not the id, in
+NP_Input. StarterFunc reads it through ExecBase at address 4 and ThisTask,
+reads no global, loads a4 from it, puts the id back in pr_CIS for the body,
+and tail-calls the body, a separate noinline function. A resident program's
+data is per invocation and nrcrt0 has no usable _geta4, so the creator's a4
+is the only right one. A plain build is unchanged.
+
+On daletop, t3_threads built -fbaserel32, -fbaserel, -resident32 and
+-resident (libnix 0007, libos32compat built base-relative) each print "t3 OK"
+and return 0; the -resident32 one, made Resident PURE and run twice at once,
+prints "t3 OK" and rc 0 in both.
+
+zlib licence, as aros-stuff's pthreads (README, docs/install.md). Copyright (c) 2026 Dalsin Limited.
+---
+diff --git a/pthreads/pthread.c b/pthreads/pthread.c
+index 1c07654..1656c63 100644
+--- a/pthreads/pthread.c
++++ b/pthreads/pthread.c
+@@ -106,6 +106,10 @@ typedef struct {
+ 	struct Task *parent;
+ 	struct Task *joiner;
+ 	struct Task *task;
++#ifdef __baserel__
++	void *a4;		// the creator's a4: this program's (or this invocation's, if resident) data
++	pthread_t self;		// the thread's id, which pr_CIS carries in a plain build
++#endif
+ 	void *ret;
+ 	pthread_attr_t attr;
+ 	void *tlsvalues[PTHREAD_KEYS_MAX];
+@@ -1412,7 +1416,25 @@ AROS_UFH3S(ULONG, CancelHandler,
+ }
+ #endif
+ 
++#ifdef __baserel__
++// A base-relative program (-fbaserel, -fbaserel32, -resident, -resident32): the new
++// process starts with no a4 of its own. pr_CIS carries the ThreadInfo (which never
++// moves), and its a4 field holds the creator's a4, saved by pthread_create. That is
++// right for a resident program too, whose data is per invocation (no _geta4 there).
++// Nothing here reads a global until a4 is loaded; pr_CIS then gets the thread's id,
++// as the body expects, and the body runs as a separate function.
++static void StarterBody(void) __attribute__((noinline));
+ static void StarterFunc(void) {
++	struct Process *proc = (struct Process *)(*(struct ExecBase **)4)->ThisTask;
++	ThreadInfo *inf = (ThreadInfo *)proc->pr_CIS;
++	__asm__ volatile ("movea.l %0,%%a4" : : "a" (inf->a4) : "memory");
++	proc->pr_CIS = (BPTR)inf->self;
++	StarterBody();
++}
++static void StarterBody(void) {
++#else
++static void StarterFunc(void) {
++#endif
+ 	ThreadInfo *inf;
+ 	void *ret;
+ 	pthread_t pid;
+@@ -1611,6 +1633,14 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void* (*start)
+ 	memset(name + oldlen, ' ', sizeof(name) - oldlen - 1);
+ 	name[sizeof(name) - 1] = '\0';
+ 
++#ifdef __baserel__
++	{
++		register void *a4 __asm__("a4");
++		__asm__ ("" : "=r" (a4));	// a4 as it is now, in the creating thread
++		inf->a4 = a4;
++		inf->self = threadnew;
++	}
++#endif
+ 	// start the child thread
+ 	inf->task = (struct Task*) CreateNewProcTags(NP_Entry, (IPTR) StarterFunc,
+ #ifdef __MORPHOS__
+@@ -1620,7 +1650,9 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void* (*start)
+ #else
+ 			(inf->attr.stackaddr == NULL && inf->attr.stacksize > 0) ? NP_StackSize : TAG_IGNORE, inf->attr.stacksize,
+ #endif
+-#ifdef __AMIGA__
++#if defined(__AMIGA__) && defined(__baserel__)
++			NP_Input, (IPTR) inf,
++#elif defined(__AMIGA__)
+ 			NP_Input, (IPTR) threadnew,
+ #else
+ 		NP_UserData, threadnew,
