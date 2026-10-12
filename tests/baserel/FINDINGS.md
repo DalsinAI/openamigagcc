@@ -193,10 +193,10 @@ Lab (copy of Instance-32, clean start each run, 60 s):
 
 `objdump -dr libos32compat.a | grep -c a4@` gives 7, all in `os32compat_malloc.o`: absolute-model code uses **a4 as a scratch register** (`movel a4@(-12),d2`, `clrl a4@(-4)` …: a4 holds the block header there) and calls `__real_malloc`/`__real_free`, which in a base-relative program need a4 to be the data base. With `--wrap=malloc,…` every allocation goes through it, so the program hangs. It needs base-relative builds (libb, libb32 multilibs) like the other libraries; built `-fbaserel32`, the no-threads program runs.
 
-## Still open
+## Open at this point (both since fixed)
 
-- **Threads under -fbaserel32** hang even with 0007 and a base-relative libos32compat. Likely the new tasks libpthread starts never load a4 (a base-relative task entry needs `geta4`); not checked yet.
-- **Fix 2 (GCC 0011, absptr EH data format)** not done: it needs a gcc and target-library rebuild, and the release rebuild is running on WorkingSpace. The "out of range" lines are still there (18 for nothreads, 25 for t3) with 0007.
+- **Threads under -fbaserel32** hung even with 0007 and a base-relative libos32compat: the new tasks libpthread started never loaded a4. Fixed by aros-stuff 0005 (Fix 4, below).
+- **Fix 2 (GCC 0011, absptr EH data format)** was not done yet: the "out of range" lines were still there (18 for nothreads, 25 for t3) with 0007. Fixed by GCC 0011 (Fix 5, below).
 
 ## Fix 4: aros-stuff 0005 (libpthread's thread entry), reworked
 
@@ -211,3 +211,22 @@ Lab, with libnix 0007, libpthread 0005 and libos32compat built base-relative:
 | t3_threads -resident32 | `t3 OK`, rc 0 |
 | t3_threads -resident | `t3 OK`, rc 0 |
 | t3_threads -resident32, `Resident … PURE`, two `Run`s at once | both `t3 OK`, rc 0 |
+
+## Fix 5: GCC 0011 (EH data always absolute)
+
+`patches/gcc/0011` overrides `ASM_PREFERRED_EH_DATA_FORMAT` to `DW_EH_PE_absptr` in `m68kamigaos.h` (the target's tm_file after `m68k.h`), so `.gcc_except_table` points at typeinfo with RELOC32 in every code model and there are no LDFCM pools. The target libraries must be rebuilt with the new compiler (an incremental build reuses the old objects).
+
+Full build of main fd08383 plus 0011, on daletop:
+
+- `objdump -r -j .gcc_except_table` on `libstdc++.a`, `libsupc++.a` and `libgcc.a` (libb32, libb and plain multilibs): 0 RELRELOC32, 0 LDFCM sections (before: 122 RELRELOC32 and 119 LDFCM in each base-relative libstdc++).
+- `catch.cpp` and `t3_threads.cpp` linked `-fbaserel32`, `-resident32`, `-fbaserel`: 0 "out of range" lines.
+
+Lab copy of Instance-32:
+
+| Program | Result |
+| --- | --- |
+| catch.cpp plain, -fbaserel32, -resident32, -fbaserel | five PASS lines and `catch OK`, rc 0 |
+| t3_threads -fbaserel32 | `t3 OK`, rc 0 |
+| catch.cpp -fbaserel32, stove without 0011 | "Program aborted", hangs |
+
+CI runs `eh-check.sh`, the link and LDFCM part of this.
