@@ -11,8 +11,8 @@ static thread_local int tl = 0;
 static std::once_flag once; static int once_count;
 int main()
 {
-    {   // warm-up: five threads alive at once grow libpthread's thread table to 10 slots
-        // before the real test, so no thread is running while the table is reallocated
+    {   // warm-up: five threads alive at once grow libpthread's thread table (1, 4, 10 slots);
+        // the 4th is created while threads 1-3 run, the case patches/aros-stuff/0001 fixes
         std::atomic<int> up{0}; std::vector<std::thread> w;
         for (int i = 0; i < 5; ++i) w.emplace_back([&] { ++up; while (up.load() < 5) std::this_thread::yield(); });
         for (auto &t : w) t.join();
