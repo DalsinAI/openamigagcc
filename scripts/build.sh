@@ -43,6 +43,7 @@ say patches
 apply "$WORK/projects/gcc" "$HERE"/patches/gcc/*.patch
 apply "$WORK" "$HERE"/patches/amiga-gcc/*.patch
 apply "$WORK/projects/libnix" "$HERE"/patches/libnix/*.patch ${LIBNIX_PATCHES:+"$LIBNIX_PATCHES"/*.patch}
+apply "$WORK/projects/aros-stuff" "$HERE"/patches/aros-stuff/*.patch
 cp "$HERE"/sys-include/*.h "$WORK/sys-include/"
 # Roadshow's bsdsocket.h and usergroup.h inlines (amiga-netinclude, installed
 # beside the NDK's) clobber registers their arguments sit in; GCC 16 refuses
