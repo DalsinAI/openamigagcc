@@ -197,3 +197,14 @@ Lab (copy of Instance-32, clean start each run, 60 s):
 
 - **Threads under -fbaserel32** hang even with 0007 and a base-relative libos32compat. Likely the new tasks libpthread starts never load a4 (a base-relative task entry needs `geta4`); not checked yet.
 - **Fix 2 (GCC 0011, absptr EH data format)** not done: it needs a gcc and target-library rebuild, and the release rebuild is running on WorkingSpace. The "out of range" lines are still there (18 for nothreads, 25 for t3) with 0007.
+
+## Fix 4: aros-stuff 0005 (libpthread's thread entry)
+
+`StarterFunc`, the `NP_Entry` of every thread's process, ran with no a4. `__saveds` does nothing with this stove (an empty `__saveds` function compiles to a bare `rts` under `-fbaserel`; `StarterFunc` with it still read `a4@(0)` for SysBase first), so under `__baserel__` it now does `jsr _geta4` (the startup code's) and tail-calls the body. `objdump`: libb, libb/libm020 and libb32/libm020 `StarterFunc` start with `jsr _geta4` (RELOC32); the plain build is byte-for-byte as before. The async cancel handler is compiled out (`USE_ASYNC_CANCEL` is off), so there is no other entry exec calls.
+
+Lab, with libnix 0007, libpthread 0005 and libos32compat built base-relative:
+
+| Program | Result |
+| --- | --- |
+| t3_threads -fbaserel32 | `t3 OK`, rc 0 |
+| t3_threads -fbaserel | `t3 OK`, rc 0 |
