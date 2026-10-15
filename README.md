@@ -1,8 +1,17 @@
 # OpenAmigaGCC
 
-GCC 16.2 for AmigaOS 3.x (`m68k-amigaos`), with the Team's fixes. This is the compiler behind AmigaChrome's `os32-gcc16` stove and the Open family's builds.
+GCC 16.2 for AmigaOS 3.x (`m68k-amigaos`), with the Team's fixes. The table below lists every system it is meant for, and which ones are released. This is the compiler behind AmigaChrome's `os32-gcc16` stove and the Open family's builds.
 
 It builds on bebbo's amiga-gcc line (GCC for `m68k-amigaos` with libnix) and adds patches for bugs the Team has found and proved while building the Open family. The patches, the build recipe and the notes are here; GCC's and libnix's own sources are fetched from their upstreams by the recipe.
+
+## Systems
+
+| System | Target | Provided by | How to install | Status |
+| --- | --- | --- | --- | --- |
+| AmigaOS 3.2.3 (and AmigaOS 3.x) on 68k | `m68k-amigaos` | this repository's release [v16.2.0-open2](https://github.com/DalsinAI/openamigagcc/releases/tag/v16.2.0-open2): the x86-64 Linux toolchain and the complete source. For ARM64 Linux, 16.2.0-open1's toolchain. | unpack the toolchain and add the AmigaOS 3.2 NDK: [docs/install.md](docs/install.md) | released, 12 October 2026 |
+| AmigaChrome (its 68k instances, which run AmigaOS 3.2.3) | `m68k-amigaos` | the same compiler, as ACKitchen's `os32-gcc16` stove, built from this repository's `scripts/build.sh`. AROS 68k instances use amigachrome-stoves' `aros68k-gcc16` (`m68k-aros`) instead. | the stove is built on the Cradle machine into Cradle's Stoves folder, with its own copy of the NDK (never in git or a release); or install the release as for AmigaOS 3.2.3 | in use |
+| GFOS (GirlfriendOS): the Team's own system, AmigaChrome with the open ROM | `m68k-amigaos` | the `os32-gcc16` stove, as in the AmigaChrome row: the open ROM's modules build with it against the stove's NDK 3.2 headers (there is no open ROM NDK yet), and its exec with `aros68k-gcc16` (`m68k-aros`) | as for the AmigaChrome row | name not final |
+| AmigaOS 4.1 on PowerPC | `ppc-amigaos` | amigachrome-stoves' `os4-gcc16` recipe (GCC 16.2.0, binutils 2.47, clib2 and clib4), [amigachrome-stoves #8](https://github.com/DalsinAI/amigachrome-stoves/pull/8), open. amigachrome's `scripts/build_os4_stove.sh` (amigachrome #496, merged) builds it as ACKitchen's `os4` stove. | not yet in a release: build it from the recipe, which downloads Hyperion's AmigaOS 4.1 SDK on the building machine | not yet: [docs/ppc-amigaos.md](docs/ppc-amigaos.md) says what is missing |
 
 ## Status
 
