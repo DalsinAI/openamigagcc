@@ -13,7 +13,7 @@
    mathieee.s models the libraries and exec's OldOpenLibrary; libnix's own
    __initlibraries opens them, as a program's start code does.
    With -DHOST it prints the expected values instead.
-   MIT licence, Copyright (c) 2026 Dalsin Limited. */
+   MIT licence, Copyright (c) 2026 AmigaChrome Team. */
 typedef unsigned long long u64; typedef long long s64;
 #define NI __attribute__((noinline, noclone))
 NI double u2d(u64 x) { return (double)x; }

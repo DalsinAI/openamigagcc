@@ -6,7 +6,7 @@ fd2pragma for the 68k Amiga (here Roadshow's bsdsocket.h and usergroup.h)
 list d0, d1, a0 and a1 as clobbered even where the arguments sit in them.
 For each such call this makes the clashing registers dummy outputs instead,
 which says the same thing (the library call may change them) in a form GCC
-accepts. Nothing else changes. GPL-3.0-or-later. Copyright (c) 2026 Dalsin Limited."""
+accepts. Nothing else changes. GPL-3.0-or-later. Copyright (c) 2026 AmigaChrome Team."""
 import re
 import sys
 

@@ -10,7 +10,7 @@ compiler's, and the spinlocks test for != 0 (the lock was held). The MorphOS
 branch of pthread_spin_lock, which uses the real builtin, was inverted the
 same way and is right now too.
 
-zlib licence, as aros-stuff's pthreads (README, docs/install.md). Copyright (c) 2026 Dalsin Limited.
+zlib licence, as aros-stuff's pthreads (README, docs/install.md). Copyright (c) 2026 AmigaChrome Team.
 ---
 diff --git a/pthreads/pthread.c b/pthreads/pthread.c
 index d547974..e320903 100644

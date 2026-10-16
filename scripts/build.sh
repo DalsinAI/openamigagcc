@@ -7,7 +7,7 @@
 # Nothing is fetched: the build runs without network access when `unshare` can
 # take it away, so a missing source stops the build instead of downloading.
 # Extra libnix patches can be given in LIBNIX_PATCHES (a folder of *.patch).
-# GPL-3.0-or-later, like the patches it goes with. Copyright (c) 2026 Dalsin Limited.
+# GPL-3.0-or-later, like the patches it goes with. Copyright (c) 2026 AmigaChrome Team.
 set -euo pipefail
 WORK=$(cd "$1" && pwd); PREFIX=$2; NDK=$3; JOBS=${4:-$(nproc)}
 HERE=$(cd "$(dirname "$0")/.." && pwd)
