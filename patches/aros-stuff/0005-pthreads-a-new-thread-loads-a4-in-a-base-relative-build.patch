@@ -18,7 +18,7 @@ On daletop, t3_threads built -fbaserel32, -fbaserel, -resident32 and
 and return 0; the -resident32 one, made Resident PURE and run twice at once,
 prints "t3 OK" and rc 0 in both.
 
-zlib licence, as aros-stuff's pthreads (README, docs/install.md). Copyright (c) 2026 Dalsin Limited.
+zlib licence, as aros-stuff's pthreads (README, docs/install.md). Copyright (c) 2026 AmigaChrome Team.
 ---
 diff --git a/pthreads/pthread.c b/pthreads/pthread.c
 index 1c07654..1656c63 100644

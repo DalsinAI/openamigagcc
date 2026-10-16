@@ -12,7 +12,7 @@ toolchain's ndk-include/inline/*.h, it moves the A6 line in each macro the
 same way, so a toolchain can be fixed without a rebuild.
 Idempotent: a file already in that order is left alone; a script with neither
 order, or no file at all, stops the build.
-GPL-3.0-or-later. Copyright (c) 2026 Dalsin Limited."""
+GPL-3.0-or-later. Copyright (c) 2026 AmigaChrome Team."""
 import os
 import re
 import sys
