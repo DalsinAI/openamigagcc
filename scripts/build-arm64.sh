@@ -12,7 +12,7 @@
 #              in-tree for the ARM64 host (LGPL; ship them with the source)
 # Needs aarch64-linux-gnu-gcc and -g++. Nothing is fetched (no network when
 # unshare can take it away).
-# GPL-3.0-or-later. Copyright (c) 2026 Dalsin Limited.
+# GPL-3.0-or-later. Copyright (c) 2026 AmigaChrome Team.
 set -euo pipefail
 WORK=$(cd "$1" && pwd); X86=$(cd "$2" && pwd); ARM=$3; TB=$(cd "$4" && pwd); JOBS=${5:-$(nproc)}
 HOST=aarch64-linux-gnu; BUILD=x86_64-pc-linux-gnu; TARGET=m68k-amigaos

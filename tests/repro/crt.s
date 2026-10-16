@@ -1,4 +1,4 @@
-| Start code for raw 68k images under qemu-m68k. MIT licence, Copyright (c) 2026 Dalsin Limited.
+| Start code for raw 68k images under qemu-m68k. MIT licence, Copyright (c) 2026 AmigaChrome Team.
 	.text
 	.globl _start
 _start:

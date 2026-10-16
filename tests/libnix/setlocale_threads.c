@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* Copyright (c) 2026 Dalsin Limited */
+/* Copyright (c) 2026 AmigaChrome Team */
 /* setlocale_threads: what libstdc++'s generic locale model does for every
    floating-point number a stream reads or writes, from 8 threads at once.
    Reading (__convert_to_v): save setlocale(LC_ALL, NULL), set "C", strtod,
