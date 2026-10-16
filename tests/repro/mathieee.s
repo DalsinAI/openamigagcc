@@ -10,7 +10,7 @@
 |    Open runs "moveq #64,d0; fmove.l d0,fpcr": single precision.
 |  - mathieeedoubtrans.library 47.2: Open leaves FPCR alone.
 | The vectors are filled in by softfloat.c; the Open side effects are in
-| softfloat.c's fake_open. MIT licence, Copyright (c) 2026 Dalsin Limited.
+| softfloat.c's fake_open. MIT licence, Copyright (c) 2026 AmigaChrome Team.
 	.text
 	.globl _fake_OldOpenLibrary
 _fake_OldOpenLibrary:			| a1 = name; d0 = base

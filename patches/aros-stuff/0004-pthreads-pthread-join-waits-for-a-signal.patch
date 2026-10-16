@@ -11,7 +11,7 @@ to the joiner too when that is another task. The signal is cleared under
 thread_sem before finished is read, so a signal sent after that read is still
 pending at Wait, and a stray one (Ctrl-F) only goes round the loop again.
 
-zlib licence, as aros-stuff's pthreads (README, docs/install.md). Copyright (c) 2026 Dalsin Limited.
+zlib licence, as aros-stuff's pthreads (README, docs/install.md). Copyright (c) 2026 AmigaChrome Team.
 ---
 diff --git a/pthreads/pthread.c b/pthreads/pthread.c
 index e320903..1c07654 100644

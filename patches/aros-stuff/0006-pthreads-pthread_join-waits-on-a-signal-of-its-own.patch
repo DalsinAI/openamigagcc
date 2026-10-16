@@ -30,7 +30,7 @@ against the stove's library (0001-0004) it fails the six Ctrl-F cases.
 t3race and t3w_warm built against 0001-0006 printed "t3 OK" 19 times and
 "t3w OK" 18 times out of 19 and 18 runs.
 
-zlib licence, as aros-stuff's pthreads (README, docs/install.md). Copyright (c) 2026 Dalsin Limited.
+zlib licence, as aros-stuff's pthreads (README, docs/install.md). Copyright (c) 2026 AmigaChrome Team.
 ---
 diff --git a/pthreads/pthread.c b/pthreads/pthread.c
 index 1656c63..3761644 100644
