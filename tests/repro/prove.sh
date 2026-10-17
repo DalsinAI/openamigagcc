@@ -19,7 +19,7 @@ CC="$B/m68k-amigaos-gcc"; CXX="$B/m68k-amigaos-g++"; OBJDUMP="$B/m68k-amigaos-ob
 bad=0
 
 image() {   # image NAME [CPU [LIBS]]: link $O/NAME.o into $O/NAME.elf
-  local n=$1 cpu=${2:--m68020} libs=${3:-}
+  local n=$1 cpu=${2:--m68040} libs=${3:-}
   "$CC" $cpu -O1 -fno-builtin -c "$D/rt.c" -o "$O/rt.o" || return 2
   "$CC" $cpu -nostartfiles -nostdlib -o "$O/$n.hunk" "$D/crt.s" "$O/$n.o" "$O/rt.o" $libs || return 2
   python3 "$D/mkelf.py" "$O/$n.hunk" "$O/$n.elf" && chmod +x "$O/$n.elf"
@@ -34,15 +34,15 @@ built() {   # built LABEL: a reproducer that did not compile, link or convert is
 }
 
 for opt in -O1 -O2 -Os; do
-  "$CC" -m68020 $opt "$@" -c "$D/shift.c" -o "$O/shift.o" && image shift && echo -n "[$opt] " && run shift shift || built "[$opt] shift"
-  "$CC" -m68020 $opt "$@" -c "$D/memmove.c" -o "$O/memmove.o" && image memmove && echo -n "[$opt] " && run memmove memmove || built "[$opt] memmove"
-  "$CXX" -m68020 $opt "$@" -fno-exceptions -c "$D/copyback.cpp" -o "$O/copyback.o" && image copyback && echo -n "[$opt] " && run copyback copy_backward || built "[$opt] copy_backward"
+  "$CC" -m68040 $opt "$@" -c "$D/shift.c" -o "$O/shift.o" && image shift && echo -n "[$opt] " && run shift shift || built "[$opt] shift"
+  "$CC" -m68040 $opt "$@" -c "$D/memmove.c" -o "$O/memmove.o" && image memmove && echo -n "[$opt] " && run memmove memmove || built "[$opt] memmove"
+  "$CXX" -m68040 $opt "$@" -fno-exceptions -c "$D/copyback.cpp" -o "$O/copyback.o" && image copyback && echo -n "[$opt] " && run copyback copy_backward || built "[$opt] copy_backward"
 done
 
 # a nested inline library call, Stricmp(FilePart(x), ...), with the NDK's own inline headers
 NDKINC="-isystem $B/../m68k-amigaos/ndk-include"
 for opt in -O1 -O2 -Os; do
-  "$CC" -m68020 $opt "$@" $NDKINC -c "$D/nested.c" -o "$O/nested.o" && image nested && echo -n "[$opt] " && run nested nested || built "[$opt] nested"
+  "$CC" -m68040 $opt "$@" $NDKINC -c "$D/nested.c" -o "$O/nested.o" && image nested && echo -n "[$opt] " && run nested nested || built "[$opt] nested"
 done
 
 # 68000: byte copies when the alignment is unknown, and odd sizes backwards
@@ -64,22 +64,24 @@ for opt in -O1 -O2; do
 done
 
 # 64-bit libcall arguments pushed from stack slots, when tuned for the 68040/060
-for opt in "-O1 -m68040" "-O2 -m68040" "-O1 -m68060" "-O2 -m68060" "-Os -m68060" "-O2 -m68020 -mtune=68040"; do
-  "$CC" $opt "$@" -c "$D/push64.c" -o "$O/push64.o" && image push64 -m68020 -lgcc && echo -n "[$opt] " && run push64 push64 || built "[$opt] push64"
+for opt in "-O1 -m68040" "-O2 -m68040" "-O1 -m68060" "-O2 -m68060" "-Os -m68060"; do
+  "$CC" $opt "$@" -c "$D/push64.c" -o "$O/push64.o" && image push64 -m68040 -lgcc && echo -n "[$opt] " && run push64 push64 || built "[$opt] push64"
 done
 
-# soft-float doubles (-m68060, and -m68020 without -m68881) on a machine with an FPU:
+# soft-float doubles (-m68060, and -m68040 without -m68881) on a machine with an FPU:
 # libnix's own __initlibraries opens the IEEE libraries (mathieee.s models OS 3.2.3's,
 # which set the task's FPCR when opened) and must leave FPCR at 0 for their FPU code
 NIXLIBS="${NIXOBJ:-} -L$B/../m68k-amigaos/libnix/lib -Wl,--start-group -lm -lnix -lstubs -lgcc -Wl,--end-group"
-for c in "-m68060 m68060" "-m68020 m68040"; do
+for c in "-m68060 m68060" "-m68040 m68040"; do
   cpu=${c% *}; qcpu=${c#* }
-  "$CC" $cpu -O2 "$@" -c "$D/softfloat.c" -o "$O/softfloat.o" && "$CC" $cpu -c "$D/mathieee.s" -o "$O/mathieee.o" &&
-    image softfloat $cpu "$O/mathieee.o $NIXLIBS" && echo -n "[-O2 $cpu] " && run softfloat softfloat "$qcpu" || built "[-O2 $cpu] softfloat"
+  # -m68040 soft float links libnix's soft libm020 only with the specs file (docs/m68040-soft-float-link.md)
+  sp=; [ "$cpu" = -m68040 ] && sp="-specs=$D/../../build/m68k-soft-m68040.specs"
+  "$CC" $cpu $sp -O2 "$@" -c "$D/softfloat.c" -o "$O/softfloat.o" && "$CC" $cpu -c "$D/mathieee.s" -o "$O/mathieee.o" &&
+    image softfloat "$cpu $sp" "$O/mathieee.o $NIXLIBS" && echo -n "[-O2 $cpu] " && run softfloat softfloat "$qcpu" || built "[-O2 $cpu] softfloat"
 done
 
 rm -f "$O/calloc.o"
-"$CC" -m68020 -O2 "$@" -c "$D/calloc.c" -o "$O/calloc.o" && image calloc && echo -n "[-O2] " && run calloc calloc || built "[-O2] calloc"
+"$CC" -m68040 -O2 "$@" -c "$D/calloc.c" -o "$O/calloc.o" && image calloc && echo -n "[-O2] " && run calloc calloc || built "[-O2] calloc"
 if [ ! -f "$O/calloc.o" ]; then built "[-O2] calloc code"
 elif "$OBJDUMP" -d "$O/calloc.o" | awk '/<_calloc>:/,/rts/' | grep -q 'jsr.*_calloc\|jra.*_calloc\|bsr.*_calloc'; then
   echo "[-O2] calloc code: WRONG (calloc calls calloc)"; bad=1
@@ -88,7 +90,7 @@ else echo "[-O2] calloc code: right (calloc doesn't call itself)"; fi
 # a library's own memset with a helper loop: -fno-tree-loop-distribute-patterns keeps the loop a loop
 for opt in -O2 -Os; do
   rm -f "$O/selfmem.s"
-  if ! "$CC" -m68020 $opt "$@" -fno-tree-loop-distribute-patterns -S -o "$O/selfmem.s" "$D/selfmem.c"; then built "[$opt] selfmem"
+  if ! "$CC" -m68040 $opt "$@" -fno-tree-loop-distribute-patterns -S -o "$O/selfmem.s" "$D/selfmem.c"; then built "[$opt] selfmem"
   elif awk '/^_fill_bytes:/,/rts/' "$O/selfmem.s" | grep -q 'jsr.*_memset\|jbsr.*_memset\|bsr.*_memset'; then
     echo "[$opt] selfmem: WRONG (the helper loop became a call to memset)"; bad=1
   else echo "[$opt] selfmem: right (with -fno-tree-loop-distribute-patterns an own memset loop stays a loop)"; fi
@@ -96,7 +98,7 @@ done
 
 for opt in -O2 -Os; do
   rm -f "$O/null.o"
-  if ! "$CC" -m68020 $opt "$@" -c "$D/null.c" -o "$O/null.o"; then built "[$opt] null"
+  if ! "$CC" -m68040 $opt "$@" -c "$D/null.c" -o "$O/null.o"; then built "[$opt] null"
   elif "$OBJDUMP" -d "$O/null.o" | grep -qE 'trap +#7'; then echo "[$opt] null: WRONG (trap #7)"; bad=1
   else echo "[$opt] null: right (address 0 is read, no trap #7)"; fi
 done

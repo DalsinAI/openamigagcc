@@ -15,7 +15,7 @@ WRAP="-los32compat -Wl,--wrap=malloc -Wl,--wrap=calloc -Wl,--wrap=realloc -Wl,--
 # libos32compat must match the code model (FINDINGS.md: the absolute one hangs a
 # base-relative program): compat/, compat/libb or compat/libb32 (amigachrome-stoves #7).
 compat_dir() { case $1 in *-fbaserel32*) echo "$STOVE/compat/libb32";; *-fbaserel*) echo "$STOVE/compat/libb";; *) echo "$STOVE/compat";; esac; }
-F="-m68020 -m68881 -O2 -fno-delete-null-pointer-checks -fomit-frame-pointer -std=gnu++23"
+F="-m68040 -m68881 -O2 -fno-delete-null-pointer-checks -fomit-frame-pointer -std=gnu++23"
 mkdir -p "$OUT"
 for v in plain:"" b32:-fbaserel32 b16:-fbaserel; do
     n=${v%%:*}; f=${v#*:}

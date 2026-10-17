@@ -5,7 +5,7 @@
  * thread's real end and puts the program's Ctrl-F back. Prints PASS or FAIL per case
  * and "joinsig OK" (rc 0) or "joinsig FAILED" (rc 20).
  *
- *   m68k-amigaos-gcc -m68020 -O2 -Wall -o joinsig joinsig.c -lpthread
+ *   m68k-amigaos-gcc -m68040 -specs=../../build/m68k-soft-m68040.specs -O2 -Wall -o joinsig joinsig.c -lpthread
  *
  * Copyright (c) 2026 AmigaChrome Team. zlib licence, as aros-stuff's pthreads. */
 #include <pthread.h>
