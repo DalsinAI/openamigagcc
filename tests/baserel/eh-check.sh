@@ -11,7 +11,7 @@ set -u
 P=$1; CXX="$P/bin/m68k-amigaos-g++"; OBJDUMP="$P/bin/m68k-amigaos-objdump"
 D=$(cd "$(dirname "$0")" && pwd); O=$(mktemp -d); bad=0
 for m in -fbaserel32 -resident32 -fbaserel; do
-  if ! "$CXX" -m68020 -O2 $m -o "$O/catch$m" "$D/catch.cpp" -lpthread > "$O/catch$m.log" 2>&1; then
+  if ! "$CXX" -m68040 -O2 $m -o "$O/catch$m" "$D/catch.cpp" -lpthread > "$O/catch$m.log" 2>&1; then
     echo "$m: WRONG (did not link)"; sed 's/^/  /' "$O/catch$m.log" | head -20; bad=1
   elif n=$(grep -c 'out of range' "$O/catch$m.log"); [ "$n" != 0 ]; then
     echo "$m: WRONG ($n 'out of range' lines)"; grep -m3 'out of range' "$O/catch$m.log"; bad=1

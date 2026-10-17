@@ -66,7 +66,7 @@ lab job.
 Programs are AmigaOS 3.x hunk executables linked with libnix:
 
 ```bash
-m68k-amigaos-gcc -m68020 -O2 -o hello hello.c
+m68k-amigaos-gcc -m68040 -O2 -o hello hello.c
 ```
 
 The driver adds `-fno-delete-null-pointer-checks` and

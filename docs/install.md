@@ -42,8 +42,8 @@ The toolchain needs glibc 2.38 or later (Ubuntu 24.04 or later, Debian 13 or lat
 ## Use
 
 ```bash
-m68k-amigaos-gcc -m68020 -O2 -o hello hello.c
-m68k-amigaos-g++ -m68020 -O2 -std=c++23 -o prog prog.cpp -lpthread -latomic
+m68k-amigaos-gcc -m68040 -O2 -o hello hello.c
+m68k-amigaos-g++ -m68040 -O2 -std=c++23 -o prog prog.cpp -lpthread -latomic
 ```
 
 The driver adds two safe defaults, each of which a build can turn back on with the positive option:
