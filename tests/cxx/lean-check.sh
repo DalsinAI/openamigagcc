@@ -6,7 +6,7 @@
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 CXX=${CXX:-m68k-amigaos-g++}; NM=${NM:-m68k-amigaos-nm}
-FLAGS=${FLAGS:--m68020 -O2 -fomit-frame-pointer}
+FLAGS=${FLAGS:--m68040 -O2 -fomit-frame-pointer}
 PROFILE="-std=gnu++23 -fno-exceptions -fno-rtti -fno-threadsafe-statics -fno-asynchronous-unwind-tables -fno-unwind-tables"
 OUT=$(mktemp -d); trap 'rm -rf "$OUT"' EXIT
 # shellcheck disable=SC2086
