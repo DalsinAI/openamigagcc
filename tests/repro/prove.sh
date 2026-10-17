@@ -74,8 +74,10 @@ done
 NIXLIBS="${NIXOBJ:-} -L$B/../m68k-amigaos/libnix/lib -Wl,--start-group -lm -lnix -lstubs -lgcc -Wl,--end-group"
 for c in "-m68060 m68060" "-m68040 m68040"; do
   cpu=${c% *}; qcpu=${c#* }
-  "$CC" $cpu -O2 "$@" -c "$D/softfloat.c" -o "$O/softfloat.o" && "$CC" $cpu -c "$D/mathieee.s" -o "$O/mathieee.o" &&
-    image softfloat $cpu "$O/mathieee.o $NIXLIBS" && echo -n "[-O2 $cpu] " && run softfloat softfloat "$qcpu" || built "[-O2 $cpu] softfloat"
+  # -m68040 soft float links libnix's soft libm020 only with the specs file (docs/m68040-soft-float-link.md)
+  sp=; [ "$cpu" = -m68040 ] && sp="-specs=$D/../../build/m68k-soft-m68040.specs"
+  "$CC" $cpu $sp -O2 "$@" -c "$D/softfloat.c" -o "$O/softfloat.o" && "$CC" $cpu -c "$D/mathieee.s" -o "$O/mathieee.o" &&
+    image softfloat "$cpu $sp" "$O/mathieee.o $NIXLIBS" && echo -n "[-O2 $cpu] " && run softfloat softfloat "$qcpu" || built "[-O2 $cpu] softfloat"
 done
 
 rm -f "$O/calloc.o"

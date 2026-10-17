@@ -42,9 +42,11 @@ The toolchain needs glibc 2.38 or later (Ubuntu 24.04 or later, Debian 13 or lat
 ## Use
 
 ```bash
-m68k-amigaos-gcc -m68040 -O2 -o hello hello.c
-m68k-amigaos-g++ -m68040 -O2 -std=c++23 -o prog prog.cpp -lpthread -latomic
+m68k-amigaos-gcc -m68040 -specs=m68k-soft-m68040.specs -O2 -o hello hello.c
+m68k-amigaos-g++ -m68040 -specs=m68k-soft-m68040.specs -O2 -std=c++23 -o prog prog.cpp -lpthread -latomic
 ```
+
+`-m68040` alone is soft float, but the link would take libnix's FPU libm; the specs file (`build/m68k-soft-m68040.specs` in this repository) keeps the link soft. Add `-m68881` instead for a hard-float program. See [m68040-soft-float-link.md](m68040-soft-float-link.md).
 
 The driver adds two safe defaults, each of which a build can turn back on with the positive option:
 - `-fno-delete-null-pointer-checks`: address 0 is memory on an Amiga;

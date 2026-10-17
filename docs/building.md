@@ -66,8 +66,11 @@ lab job.
 Programs are AmigaOS 3.x hunk executables linked with libnix:
 
 ```bash
-m68k-amigaos-gcc -m68040 -O2 -o hello hello.c
+m68k-amigaos-gcc -m68040 -specs=build/m68k-soft-m68040.specs -O2 -o hello hello.c
 ```
+
+The specs file keeps a soft-float `-m68040` link off libnix's FPU libm
+([m68040-soft-float-link.md](m68040-soft-float-link.md)).
 
 The driver adds `-fno-delete-null-pointer-checks` and
 `-fno-malloc-memset-to-calloc` unless a build passes the positive form; see
