@@ -1,0 +1,100 @@
+From 057d3312583d8232f07353d8b0c62d722b1a3032 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Mon, 19 Oct 2026 00:39:05 +0100
+Subject: [PATCH 2/2] m68k: --pcrel-calls assembles jsr/jmp to a symbol as
+ bsr.l/bra.l
+
+On a 68020 or later, jsr and jmp to a plain symbol become bsr.l and
+bra.l: the same six bytes, and in an Amiga program's one code hunk no
+relocation for LoadSeg to apply (47% of OpenBrowser's 1.69 million). The
+linker already turns bsr.l/bra.l whose target is in another hunk back
+into jsr/jmp by absolute address (amigaoslink.c). A 68000 build keeps
+jsr/jmp.
+---
+ gas/config/tc-m68k.c | 42 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
+
+diff --git a/gas/config/tc-m68k.c b/gas/config/tc-m68k.c
+index 8a6a253a..7a9f4be4 100644
+--- a/gas/config/tc-m68k.c
++++ b/gas/config/tc-m68k.c
+@@ -85,6 +85,7 @@ int flag_want_pic;
+ static int flag_short_refs;	/* -l option.  */
+ static int flag_long_jumps;	/* -S option.  */
+ static int flag_keep_pcrel;	/* --pcrel option.  */
++static int flag_pcrel_calls;	/* --pcrel-calls option.  */
+ static int flag_small_code;	/* -sc option */
+ 
+ #define FLAG_SMALL_CODE (0 && flag_small_code)
+@@ -4459,6 +4460,39 @@ md_assemble (char *str)
+   if (!initialized)
+     m68k_init_arch ();
+ 
++  /* --pcrel-calls: "jsr sym" and "jmp sym" to a plain symbol are assembled
++     as "bsr.l sym" and "bra.l sym" (68020 and up): the same size, and no
++     relocation for the loader when the target ends up in the same hunk;
++     the Amiga linker turns them back into jsr/jmp by absolute address
++     when it does not.  */
++  if (flag_pcrel_calls && (current_architecture & (m68020up | cpu32)))
++    {
++      static char buf[1024];
++      const char *p = str;
++      while (*p == ' ' || *p == '\t')
++	p++;
++      if ((strncmp (p, "jsr", 3) == 0 || strncmp (p, "jmp", 3) == 0)
++	  && (p[3] == ' ' || p[3] == '\t'))
++	{
++	  const char *q = p + 3, *e;
++	  while (*q == ' ' || *q == '\t')
++	    q++;
++	  e = q;
++	  if (ISALPHA (*e) || *e == '_' || *e == '.' || *e == '$')
++	    {
++	      while (ISALNUM (*e) || *e == '_' || *e == '.' || *e == '$')
++		e++;
++	      while (*e == ' ' || *e == '\t')
++		e++;
++	      if (*e == 0 && strlen (q) + 8 < sizeof buf)
++		{
++		  sprintf (buf, "%s %s", p[1] == 's' ? "bsr.l" : "bra.l", q);
++		  str = buf;
++		}
++	    }
++	}
++    }
++
+   /* In MRI mode, the instruction and operands are separated by a
+      space.  Anything following the operands is a comment.  The label
+      has already been removed.  */
+@@ -7747,6 +7781,8 @@ const struct option md_longopts[] = {
+   {"disp-size-default-32", no_argument, NULL, OPTION_DISP_SIZE_DEFAULT_32},
+ #define OPTION_PCREL (OPTION_MD_BASE + 7)
+   {"pcrel", no_argument, NULL, OPTION_PCREL},
++#define OPTION_PCREL_CALLS (OPTION_MD_BASE + 8)
++  {"pcrel-calls", no_argument, NULL, OPTION_PCREL_CALLS},
+   {NULL, no_argument, NULL, 0}
+ };
+ const size_t md_longopts_size = sizeof (md_longopts);
+@@ -7771,6 +7807,11 @@ md_parse_option (int c, const char *arg)
+       flag_keep_pcrel = 1;
+       break;
+ 
++    case OPTION_PCREL_CALLS:	/* --pcrel-calls: jsr/jmp to a symbol as
++				   bsr.l/bra.l.  */
++      flag_pcrel_calls = 1;
++      break;
++
+     case 's':
+       if (!strcmp(arg, "c") || !strcmp(arg, "mallcode"))
+ 	flag_small_code = 1;
+@@ -7965,6 +8006,7 @@ md_show_usage (FILE *stream)
+ -S			turn jbsr into jsr and keeps jra for non local labels.\n\
+ -smallcode, -sc		small code model - does nothing atm\n\
+ --pcrel                 never turn PC-relative branches into absolute jumps\n\
++--pcrel-calls           assemble jsr/jmp to a symbol as bsr.l/bra.l (68020 up)\n\
+ --register-prefix-optional\n\
+ 			recognize register names without prefix character\n\
+ --bitwise-or		do not treat `|' as a comment character\n\
+-- 
+2.53.0
+

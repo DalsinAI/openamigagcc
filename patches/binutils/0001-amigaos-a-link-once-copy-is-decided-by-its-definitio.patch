@@ -1,0 +1,56 @@
+From 4f05ac0cdb5c4cba2972d1560ddfb52a5bad0e11 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Mon, 19 Oct 2026 00:39:04 +0100
+Subject: [PATCH 1/2] amigaos: a link-once copy is decided by its definitions,
+ not its references
+
+A template function's hunk counted the symbols it refers to (calls out)
+as well as the ones it defines, and a reference is not weak, so every
+copy that calls anything was kept, once per object: 5.75 MB of duplicate
+code in OpenBrowser's engine (6,610 names). Only the definitions decide
+now, so one copy is kept and the rest discarded, as for copies that call
+nothing.
+---
+ bfd/amigaos.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/bfd/amigaos.c b/bfd/amigaos.c
+index cfe1e600..8d13b2ec 100644
+--- a/bfd/amigaos.c
++++ b/bfd/amigaos.c
+@@ -3621,7 +3621,7 @@ amiga_slurp_symbol_table (bfd *abfd)
+ 	  }
+ 	}
+       {
+-	unsigned i = 0;
++	unsigned i = 0, defs = 0;
+ 	bool all_weak = true;
+ 	for (i = 0; i < asect->amiga_symbol_count; ++i)
+ 	  {
+@@ -3630,6 +3630,14 @@ amiga_slurp_symbol_table (bfd *abfd)
+ 	      section->symbol->name = asect->amiga_symbols[i].symbol.name;
+ 	      section->symbol->flags |= BSF_GLOBAL;
+ 	    }
++	    /* A reference the section makes to another symbol (a call out
++	       of a template function) says nothing about the section itself:
++	       only its definitions decide whether it is a link-once copy.
++	       Counting the references kept every template copy that calls
++	       anything, once per object. */
++	    if (bfd_is_und_section (asect->amiga_symbols[i].symbol.section))
++	      continue;
++	    defs++;
+ 	    if (0 == (asect->amiga_symbols[i].symbol.flags & BSF_WEAK))
+ 	      all_weak = false;
+ 	  }
+@@ -3637,7 +3645,7 @@ amiga_slurp_symbol_table (bfd *abfd)
+ 	  section->symbol->name = section->name;
+ 	/* Early LTO debug sections contain a weak compilation-unit marker,
+ 	   but each section still has distinct contents that must be kept.  */
+-	if (plink_info && i && all_weak && (section->flags & SEC_DEBUGGING) == 0)
++	if (plink_info && defs && all_weak && (section->flags & SEC_DEBUGGING) == 0)
+ 	  {
+ 	    /* SBF: mark the section optional */
+ 	    section->flags |= SEC_LINK_ONCE | SEC_LINK_DUPLICATES_DISCARD | SEC_LINK_DUPLICATES_SAME_CONTENTS;
+-- 
+2.53.0
+
