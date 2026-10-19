@@ -112,6 +112,14 @@ fi
 say checks
 CC="$PREFIX/bin/m68k-amigaos-gcc"
 C=$LOGS/check; mkdir -p "$C"
+"$CC" --version | head -1 | grep -Fq '(OpenAmigaGCC 16.2.0-open3)' || {
+  echo "gcc does not identify itself as OpenAmigaGCC 16.2.0-open3"; exit 1;
+}
+link_cpu=$("$CC" -dumpspecs | sed -n '/^\*link_cpu:/{n;p;q;}')
+case "$link_cpu" in
+  *'mhard-float|m68881|mcpu=6804'* )
+    echo "-m68040 still selects the hard-float libm881"; exit 1 ;;
+esac
 printf 'volatile unsigned long s;\nint main(void) { s = *(volatile unsigned long *)0; return 0; }\n' > "$C/nullread.c"
 "$CC" -O2 -c -o "$C/nullread.o" "$C/nullread.c"
 if "$PREFIX/bin/m68k-amigaos-objdump" -d "$C/nullread.o" | grep -qE 'trap +#7'; then echo "a read of address 0 still compiles to trap #7"; exit 1; fi
