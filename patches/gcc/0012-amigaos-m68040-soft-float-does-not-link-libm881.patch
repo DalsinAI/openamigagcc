@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Mon, 19 Oct 2026 11:40:00 +0100
+Subject: [PATCH] amigaos: soft-float m68040 does not link libm881
+
+`-m68040` without `-m68881` generates the soft-float ABI, with floating
+values in integer registers.  Linking libnix's libm881 in that case returns
+values in fp0 and also makes the result unusable on an LC/EC040.
+
+Keep libm020 for every 68040 build, but add libm881 only when hard float is
+explicitly requested (or for the 68060/68080 targets, which already imply
+it).  This makes the temporary m68k-soft-m68040.specs override unnecessary
+in a toolchain containing the fix.
+---
+ gcc/config/m68k/m68kamigaos.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/config/m68k/m68kamigaos.h b/gcc/config/m68k/m68kamigaos.h
+index 556e056d3d6..01a8bc73757 100644
+--- a/gcc/config/m68k/m68kamigaos.h
++++ b/gcc/config/m68k/m68kamigaos.h
+@@ -552,7 +552,7 @@ along with GCC; see the file COPYING3.  If not see
+ 
+ #define LINK_CPU_SPEC \
+   "%{m6802*|mc6802*|m6803*|m6804*|m6806*|m6808*|mcpu=6802*|mcpu=6803*|mcpu=6804*|mcpu=6806*|mcpu=6808*:-fl libm020} " \
+-  "%{mhard-float|m68881|mcpu=6804*|mcpu=6806*|mcpu=6808*:-fl libm881}"
++  "%{mhard-float|m68881|mcpu=6806*|mcpu=6808*:-fl libm881}"
+ 
+ #ifdef TARGET_AMIGAOS_VASM
+ #define LINK_COMMAND_SPEC \
+-- 
+2.53.0
+
