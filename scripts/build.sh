@@ -29,12 +29,33 @@ done
 
 # 2. Patches, each applied once: WORK/.openamigagcc-applied lists the ones in.
 STAMP=$WORK/.openamigagcc-applied; touch "$STAMP"
+same_stamped_diff() {   # PATCH: an older revision has the same diff and its exact hash is stamped
+  local p=$1 rel=${1#"$HERE"/} now commit old_hash old_patch_id
+  now=$(git patch-id --stable < "$p" | awk '{print $1}')
+  [ -n "$now" ] || return 1
+  while read -r commit; do
+    old_hash=$(git -C "$HERE" show "$commit:$rel" 2>/dev/null | sha256sum | cut -c1-16) || continue
+    grep -qxF "$(basename "$p") $old_hash" "$STAMP" || continue
+    old_patch_id=$(git -C "$HERE" show "$commit:$rel" 2>/dev/null | git patch-id --stable | awk '{print $1}')
+    [ "$old_patch_id" = "$now" ] && return 0
+  done < <(git -C "$HERE" log --format=%H -- "$rel")
+  return 1
+}
 apply() {   # apply DIR PATCH...
   local d=$1; shift
   for p in "$@"; do
     [ -f "$p" ] || continue
     local id; id="$(basename "$p") $(sha256sum < "$p" | cut -c1-16)"
     if grep -qxF "$id" "$STAMP"; then echo "already in: $(basename "$p")"; continue; fi
+    # A release may change only a patch's mail header (for example its
+    # copyright line) while leaving the diff itself unchanged.  An older
+    # source cache then has the same named patch applied under its old hash.
+    # Accept it only when the current diff reverses cleanly, and record the
+    # new identity so later runs remain exact.
+    if grep -qF "$(basename "$p") " "$STAMP" &&
+       { git -C "$d" apply --reverse --check "$p" 2>/dev/null || same_stamped_diff "$p"; }; then
+      echo "$id" >> "$STAMP"; echo "already in (verified): $(basename "$p")"; continue
+    fi
     git -C "$d" apply --check "$p" 2>/dev/null || { echo "does not apply: $p"; exit 1; }
     git -C "$d" apply "$p"; echo "$id" >> "$STAMP"; echo "applied $(basename "$p")"
   done
@@ -53,6 +74,11 @@ python3 "$HERE/scripts/fix_inline_clobbers.py" "$WORK"/projects/amiga-netinclude
 # evaluating the arguments, so Stricmp(FilePart(x), ...) ran with DOSBase in A6.
 # Bind it after them (idempotent; stops if the code is not as expected).
 python3 "$HERE/scripts/fix_sfdc_base_order.py" "$WORK"/projects/sfdc/MacroGCC.pl "$WORK"/projects/sfdc/sfdc
+
+# 2b. amiga-gcc's framework carries a prebuilt Commodore amiga.lib in lib/ and
+#     lib/libb/, which its libamiga step would install. Take them out of the
+#     work folder: OpenAmigaGCC's libamiga.a is OpenNDK's, built in step 5b.
+rm -f "$WORK/lib/libamiga.a" "$WORK/lib/libb/libamiga.a"
 
 # 3. The NDK, from you.
 mkdir -p "$WORK/download"
@@ -84,6 +110,27 @@ for f in bin/m68k-amigaos-gprof m68k-amigaos/ndk-include/exec/types.h m68k-amiga
   [ -e "$PREFIX/$f" ] || { echo "the amiga-gcc build did not install $f (see $LOGS/make.log and $WORK/log)"; exit 1; }
 done
 
+# 5b. libamiga.a, from OpenNDK (projects/openamigasdk, pinned in
+#     scripts/sources.lock), in every multilib folder: plain for the plain
+#     ones, -fbaserel for libb and -fbaserel32 for libb32. Each old file is
+#     removed first, so a link to it (a stove's) is replaced, never written
+#     through. docs/openndk-libamiga.md.
+say "libamiga.a from OpenNDK"
+OPENNDK=$WORK/projects/openamigasdk/OpenNDK
+T=$PREFIX/m68k-amigaos
+for kind in plain baserel baserel32; do
+  case $kind in plain) fl= ;; baserel) fl=-fbaserel ;; baserel32) fl=-fbaserel32 ;; esac
+  ( PREFIX="$PREFIX/bin/m68k-amigaos-" EXTRA_CFLAGS="$fl" sh "$OPENNDK/lib/build.sh" ) > "$LOGS/openndk-libamiga-$kind.log" 2>&1 \
+    || { echo "OpenNDK's libamiga.a ($kind) failed (see $LOGS/openndk-libamiga-$kind.log)"; exit 1; }
+  cp "$OPENNDK/lib/build/m68k-amigaos/libamiga.a" "$LOGS/libamiga-$kind.a"
+done
+"$PREFIX/bin/m68k-amigaos-gcc" -print-multi-lib | while IFS=';' read -r dir _; do
+  case $dir in libb32*) kind=baserel32 ;; libb*) kind=baserel ;; *) kind=plain ;; esac
+  mkdir -p "$T/lib/$dir"
+  rm -f "$T/lib/$dir/libamiga.a"
+  cp "$LOGS/libamiga-$kind.a" "$T/lib/$dir/libamiga.a"
+done
+
 # 6. libgcc, libstdc++ and the other target libraries, against libnix's
 #    headers, so libstdc++'s configure sees C99 maths, dirent and chdir.
 say "target libraries against libnix"
@@ -112,6 +159,14 @@ fi
 say checks
 CC="$PREFIX/bin/m68k-amigaos-gcc"
 C=$LOGS/check; mkdir -p "$C"
+"$CC" --version | head -1 | grep -Fq '(OpenAmigaGCC 16.2.0-open3)' || {
+  echo "gcc does not identify itself as OpenAmigaGCC 16.2.0-open3"; exit 1;
+}
+link_cpu=$("$CC" -dumpspecs | sed -n '/^\*link_cpu:/{n;p;q;}')
+case "$link_cpu" in
+  *'mhard-float|m68881|mcpu=6804'* )
+    echo "-m68040 still selects the hard-float libm881"; exit 1 ;;
+esac
 printf 'volatile unsigned long s;\nint main(void) { s = *(volatile unsigned long *)0; return 0; }\n' > "$C/nullread.c"
 "$CC" -O2 -c -o "$C/nullread.o" "$C/nullread.c"
 if "$PREFIX/bin/m68k-amigaos-objdump" -d "$C/nullread.o" | grep -qE 'trap +#7'; then echo "a read of address 0 still compiles to trap #7"; exit 1; fi
@@ -145,5 +200,20 @@ while IFS= read -r a; do
   done
 done < <(find "$PREFIX/m68k-amigaos/libnix/lib" -name libnix.a)
 echo "libnix: $n mem*/calloc objects checked; none calls itself or a block function"
+# Every libamiga.a is OpenNDK's (its rexxvar.o; Commodore's amiga.lib has no
+# such member), and each multilib links the one in its own folder.
+n=0
+while IFS= read -r a; do
+  "$PREFIX/bin/m68k-amigaos-ar" t "$a" | grep -qx rexxvar.o || { echo "$a is not OpenNDK's libamiga.a"; exit 1; }
+  n=$((n+1))
+done < <(find "$PREFIX/m68k-amigaos" "$PREFIX/lib" -name 'libamiga.a' -not -path '*/ndk*')
+"$CC" -print-multi-lib | while IFS=';' read -r dir flags; do
+  got=$("$CC" ${flags//@/ -} -print-file-name=libamiga.a)
+  [ "$(readlink -f "$got")" = "$(readlink -f "$T/lib/$dir/libamiga.a")" ] || { echo "multilib '$dir' links $got, not its own libamiga.a"; exit 1; }
+done
+printf '#include <proto/exec.h>\n#include <clib/alib_protos.h>\nint main(void) { struct List l; NewList(&l); return IsListEmpty(&l) ? 0 : 1; }\n' > "$C/alib.c"
+"$CC" -m68040 -O2 -I"$OPENNDK/Include_H" -o "$C/alib" "$C/alib.c" -Wl,-Map,"$C/alib.map"
+grep -q 'openamigasdk/OpenNDK\|libamiga.a(newlist.o)' "$C/alib.map" || { echo "a NewList program did not link OpenNDK's libamiga.a"; exit 1; }
+echo "libamiga.a: $n copies, all OpenNDK's; every multilib links its own"
 echo "defaults: $("$CC" -### -c -x c /dev/null 2>&1 | grep -o -- '-fno-[a-z-]*' | sort -u | tr '\n' ' ')"
 echo "OpenAmigaGCC built in $PREFIX"
