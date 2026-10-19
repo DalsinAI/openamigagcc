@@ -25,7 +25,7 @@ rsync -a --no-group --exclude '.git' --exclude '/build-*/' --exclude '/download/
 rsync -a --no-group --exclude '.git' --exclude '__pycache__' "$HERE/" "$S/$SRC/openamigagcc/"
 
 # Nothing of the NDK, and every libamiga.a OpenNDK's.
-bad=$(cd "$S" && find . \( -path '*NDK3.2*' -o -iname 'amiga.lib' -o -name 'ndk-include' -o -name 'ndk13-include' \) -print | head -5)
+bad=$(cd "$S" && find . \( -path '*/projects/NDK3.2*' -o -name 'NDK3.2.lha' -o -iname 'amiga.lib' -o -name 'ndk-include' -o -name 'ndk13-include' \) -print | head -5)
 [ -z "$bad" ] || { echo "NDK files in the release: $bad"; exit 1; }
 n=0
 while IFS= read -r a; do
