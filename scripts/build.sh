@@ -75,6 +75,11 @@ python3 "$HERE/scripts/fix_inline_clobbers.py" "$WORK"/projects/amiga-netinclude
 # Bind it after them (idempotent; stops if the code is not as expected).
 python3 "$HERE/scripts/fix_sfdc_base_order.py" "$WORK"/projects/sfdc/MacroGCC.pl "$WORK"/projects/sfdc/sfdc
 
+# 2b. amiga-gcc's framework carries a prebuilt Commodore amiga.lib in lib/ and
+#     lib/libb/, which its libamiga step would install. Take them out of the
+#     work folder: OpenAmigaGCC's libamiga.a is OpenNDK's, built in step 5b.
+rm -f "$WORK/lib/libamiga.a" "$WORK/lib/libb/libamiga.a"
+
 # 3. The NDK, from you.
 mkdir -p "$WORK/download"
 [ -f "$WORK/download/NDK3.2.lha" ] || cp "$NDK" "$WORK/download/NDK3.2.lha"
@@ -103,6 +108,27 @@ done
 # gprof, ndk and ndk13 leave no _done marker: check what they install.
 for f in bin/m68k-amigaos-gprof m68k-amigaos/ndk-include/exec/types.h m68k-amigaos/ndk13-include/exec/types.h; do
   [ -e "$PREFIX/$f" ] || { echo "the amiga-gcc build did not install $f (see $LOGS/make.log and $WORK/log)"; exit 1; }
+done
+
+# 5b. libamiga.a, from OpenNDK (projects/openamigasdk, pinned in
+#     scripts/sources.lock), in every multilib folder: plain for the plain
+#     ones, -fbaserel for libb and -fbaserel32 for libb32. Each old file is
+#     removed first, so a link to it (a stove's) is replaced, never written
+#     through. docs/openndk-libamiga.md.
+say "libamiga.a from OpenNDK"
+OPENNDK=$WORK/projects/openamigasdk/OpenNDK
+T=$PREFIX/m68k-amigaos
+for kind in plain baserel baserel32; do
+  case $kind in plain) fl= ;; baserel) fl=-fbaserel ;; baserel32) fl=-fbaserel32 ;; esac
+  ( PREFIX="$PREFIX/bin/m68k-amigaos-" EXTRA_CFLAGS="$fl" sh "$OPENNDK/lib/build.sh" ) > "$LOGS/openndk-libamiga-$kind.log" 2>&1 \
+    || { echo "OpenNDK's libamiga.a ($kind) failed (see $LOGS/openndk-libamiga-$kind.log)"; exit 1; }
+  cp "$OPENNDK/lib/build/m68k-amigaos/libamiga.a" "$LOGS/libamiga-$kind.a"
+done
+"$PREFIX/bin/m68k-amigaos-gcc" -print-multi-lib | while IFS=';' read -r dir _; do
+  case $dir in libb32*) kind=baserel32 ;; libb*) kind=baserel ;; *) kind=plain ;; esac
+  mkdir -p "$T/lib/$dir"
+  rm -f "$T/lib/$dir/libamiga.a"
+  cp "$LOGS/libamiga-$kind.a" "$T/lib/$dir/libamiga.a"
 done
 
 # 6. libgcc, libstdc++ and the other target libraries, against libnix's
@@ -174,5 +200,20 @@ while IFS= read -r a; do
   done
 done < <(find "$PREFIX/m68k-amigaos/libnix/lib" -name libnix.a)
 echo "libnix: $n mem*/calloc objects checked; none calls itself or a block function"
+# Every libamiga.a is OpenNDK's (its rexxvar.o; Commodore's amiga.lib has no
+# such member), and each multilib links the one in its own folder.
+n=0
+while IFS= read -r a; do
+  "$PREFIX/bin/m68k-amigaos-ar" t "$a" | grep -qx rexxvar.o || { echo "$a is not OpenNDK's libamiga.a"; exit 1; }
+  n=$((n+1))
+done < <(find "$PREFIX/m68k-amigaos" "$PREFIX/lib" -name 'libamiga.a' -not -path '*/ndk*')
+"$CC" -print-multi-lib | while IFS=';' read -r dir flags; do
+  got=$("$CC" ${flags//@/ -} -print-file-name=libamiga.a)
+  [ "$(readlink -f "$got")" = "$(readlink -f "$T/lib/$dir/libamiga.a")" ] || { echo "multilib '$dir' links $got, not its own libamiga.a"; exit 1; }
+done
+printf '#include <proto/exec.h>\n#include <clib/alib_protos.h>\nint main(void) { struct List l; NewList(&l); return IsListEmpty(&l) ? 0 : 1; }\n' > "$C/alib.c"
+"$CC" -m68040 -O2 -I"$OPENNDK/Include_H" -o "$C/alib" "$C/alib.c" -Wl,-Map,"$C/alib.map"
+grep -q 'openamigasdk/OpenNDK\|libamiga.a(newlist.o)' "$C/alib.map" || { echo "a NewList program did not link OpenNDK's libamiga.a"; exit 1; }
+echo "libamiga.a: $n copies, all OpenNDK's; every multilib links its own"
 echo "defaults: $("$CC" -### -c -x c /dev/null 2>&1 | grep -o -- '-fno-[a-z-]*' | sort -u | tr '\n' ' ')"
 echo "OpenAmigaGCC built in $PREFIX"
