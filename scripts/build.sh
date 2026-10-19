@@ -35,6 +35,14 @@ apply() {   # apply DIR PATCH...
     [ -f "$p" ] || continue
     local id; id="$(basename "$p") $(sha256sum < "$p" | cut -c1-16)"
     if grep -qxF "$id" "$STAMP"; then echo "already in: $(basename "$p")"; continue; fi
+    # A release may change only a patch's mail header (for example its
+    # copyright line) while leaving the diff itself unchanged.  An older
+    # source cache then has the same named patch applied under its old hash.
+    # Accept it only when the current diff reverses cleanly, and record the
+    # new identity so later runs remain exact.
+    if grep -qF "$(basename "$p") " "$STAMP" && git -C "$d" apply --reverse --check "$p" 2>/dev/null; then
+      echo "$id" >> "$STAMP"; echo "already in (verified): $(basename "$p")"; continue
+    fi
     git -C "$d" apply --check "$p" 2>/dev/null || { echo "does not apply: $p"; exit 1; }
     git -C "$d" apply "$p"; echo "$id" >> "$STAMP"; echo "applied $(basename "$p")"
   done
