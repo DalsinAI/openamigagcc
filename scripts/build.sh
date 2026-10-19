@@ -29,6 +29,18 @@ done
 
 # 2. Patches, each applied once: WORK/.openamigagcc-applied lists the ones in.
 STAMP=$WORK/.openamigagcc-applied; touch "$STAMP"
+same_stamped_diff() {   # PATCH: an older revision has the same diff and its exact hash is stamped
+  local p=$1 rel=${1#"$HERE"/} now commit old_hash old_patch_id
+  now=$(git patch-id --stable < "$p" | awk '{print $1}')
+  [ -n "$now" ] || return 1
+  while read -r commit; do
+    old_hash=$(git -C "$HERE" show "$commit:$rel" 2>/dev/null | sha256sum | cut -c1-16) || continue
+    grep -qxF "$(basename "$p") $old_hash" "$STAMP" || continue
+    old_patch_id=$(git -C "$HERE" show "$commit:$rel" 2>/dev/null | git patch-id --stable | awk '{print $1}')
+    [ "$old_patch_id" = "$now" ] && return 0
+  done < <(git -C "$HERE" log --format=%H -- "$rel")
+  return 1
+}
 apply() {   # apply DIR PATCH...
   local d=$1; shift
   for p in "$@"; do
@@ -40,7 +52,8 @@ apply() {   # apply DIR PATCH...
     # source cache then has the same named patch applied under its old hash.
     # Accept it only when the current diff reverses cleanly, and record the
     # new identity so later runs remain exact.
-    if grep -qF "$(basename "$p") " "$STAMP" && git -C "$d" apply --reverse --check "$p" 2>/dev/null; then
+    if grep -qF "$(basename "$p") " "$STAMP" &&
+       { git -C "$d" apply --reverse --check "$p" 2>/dev/null || same_stamped_diff "$p"; }; then
       echo "$id" >> "$STAMP"; echo "already in (verified): $(basename "$p")"; continue
     fi
     git -C "$d" apply --check "$p" 2>/dev/null || { echo "does not apply: $p"; exit 1; }
