@@ -1,6 +1,6 @@
 # Base-relative C++: findings (daletop, 12 October 2026)
 
-Stove: openamigagcc main f9efa3d full build (~/team2/stove-gcc16-pth), compat from the installed os32-gcc16 stove. Labs: a lab copy of Instance-32 (AmigaOS 3.2.3, AC090 68040), clean start for each run.
+Stove: openamigagcc main f9efa3d full build (~/stoves-work/stove-gcc16-pth), compat from the installed os32-gcc16 stove. Labs: a lab copy of Instance-32 (AmigaOS 3.2.3, AC090 68040), clean start for each run.
 
 ## A. Multilibs
 
@@ -37,7 +37,7 @@ Which copies the links open (`-Wl,--verbose`, the libraries named above plus os3
 
 $ g++ -fbaserel32 ... -Wl,--verbose | grep 'attempt to open|succeeded' (libstdc++, libsupc++, libpthread, libatomic, libgcc, libnix, os32compat)
 ```
-attempt to open ~/team2/stove-pth-root/compat/libos32compat.a succeeded
+attempt to open ~/stoves-work/stove-pth-root/compat/libos32compat.a succeeded
 attempt to open lib/gcc/m68k-amigaos/16.2.0b/libb32/libm020/libm881/libatomic.a succeeded
 attempt to open lib/gcc/m68k-amigaos/16.2.0b/libb32/libm020/libm881/libgcc.a succeeded
 attempt to open lib/gcc/m68k-amigaos/16.2.0b/libb32/libm020/libm881/libstdc++.a succeeded
@@ -47,7 +47,7 @@ attempt to open m68k-amigaos/libnix/lib/libb32/libm020/libnix.a succeeded
 
 $ g++ -fbaserel ... -Wl,--verbose | grep 'attempt to open|succeeded' (libstdc++, libsupc++, libpthread, libatomic, libgcc, libnix, os32compat)
 ```
-attempt to open ~/team2/stove-pth-root/compat/libos32compat.a succeeded
+attempt to open ~/stoves-work/stove-pth-root/compat/libos32compat.a succeeded
 attempt to open lib/gcc/m68k-amigaos/16.2.0b/libb/libm020/libm881/libatomic.a succeeded
 attempt to open lib/gcc/m68k-amigaos/16.2.0b/libb/libm020/libm881/libgcc.a succeeded
 attempt to open lib/gcc/m68k-amigaos/16.2.0b/libb/libm020/libm881/libstdc++.a succeeded
@@ -155,7 +155,7 @@ From the failing t3-b16 link with `-Wl,-Map`:
 4387:.data           0x00036be8      0x848
 4668:.bss            0x00037430      0x398
  .list___EH_FRAME_BEGIN
-                0x00036a84        0x4 ~/team2/stove-gcc16-pth/m68k-amigaos/libnix/lib/libb/libm020/libnix.a(cxxglue.o)
+                0x00036a84        0x4 ~/stoves-work/stove-gcc16-pth/m68k-amigaos/libnix/lib/libb/libm020/libnix.a(cxxglue.o)
                 0x00036a84                _EH_FRAME_BEGINS__
                 0x0003ebe6                        ___a4_init = 0x7ffe
 ```
