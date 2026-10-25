@@ -48,3 +48,17 @@ supported CPU, floating-point and base-relative profiles, repeat this native
 control and the existing compiler qualification gates, and rebuild consumers.
 The initial local objects are only a 68040/FPU test candidate. No upload,
 upstream CI, merge, or toolchain release is implied by these local results.
+
+## Integration validation
+
+CI builds the full compiler and libnix profiles, then executes the same
+fourteen-case control under qemu-m68k using strtol.o, strtoul.o, _ctype_.o
+and iswxdigit.o extracted from the built 68020/FPU libnix archive. Only
+OS-dependent errno storage and printf reporting are replaced for that raw
+68040 test; the conversion and character-classification implementations are
+unchanged archive objects. This is not an AmigaOS startup or errno TLS test.
+The native AmigaOS control is also compiled for subsequent lab validation.
+
+Locally this runner rejected the installed original archive with RC 20 and
+passed with RC 0 after replacing only the two conversion objects in a private
+copy of that archive. The installed SDK was not modified.
