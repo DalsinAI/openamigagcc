@@ -132,4 +132,14 @@ for c in "-m68040 m68040" "-m68000 m68000"; do
     echo "[-O2 $cpu] autoinc code: WRONG ($(autoinc_code "$O/autoinc.s" | wc -l) instructions name the stepped register again, as in $(autoinc_code "$O/autoinc.s" | head -1 | tr -d '\t'))"; bad=1
   else echo "[-O2 $cpu] autoinc code: right (no instruction names a register again after (An)+ or -(An))"; fi
 done
+
+# vregs must leave no virtual register: strcat into a local array became an lea of
+# virtual-stack-vars + length - 600, vregs left it, and combine dropped the frame
+for opt in -O1 -O2; do
+  "$CC" -m68040 $opt "$@" -c "$D/vregs.c" -o "$O/vregs.o" && image vregs && echo -n "[$opt] " && run vregs vregs || built "[$opt] vregs"
+  rm -f "$O"/vregs.c.*.vregs
+  if ! "$CC" -m68040 $opt "$@" -fdump-rtl-vregs -dumpdir "$O/" -S -o "$O/vregs.s" "$D/vregs.c" || ! ls "$O"/vregs.c.*.vregs >/dev/null 2>&1; then built "[$opt] vregs dump"
+  elif grep -q 'virtual-' "$O"/vregs.c.*.vregs; then echo "[$opt] vregs dump: WRONG (a virtual register is left after vregs)"; bad=1
+  else echo "[$opt] vregs dump: right (no virtual register after vregs)"; fi
+done
 exit $bad
