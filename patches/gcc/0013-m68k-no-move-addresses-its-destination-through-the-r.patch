@@ -1,0 +1,188 @@
+From 043dada9ef99780dda9ebab5268574376308e738 Mon Sep 17 00:00:00 2001
+From: SacredTrees <121399723+SacredTrees@users.noreply.github.com>
+Date: Sun, 25 Oct 2026 09:15:07 +0000
+Subject: [PATCH] m68k: no move addresses its destination through the register
+ its source steps (PR123853)
+
+GCC 15's late-combine pass substitutes a register's definition into its
+uses. After register allocation it put a store's address, a0 + a2, into
+the byte copy that post-increments a2:
+
+    move.b (a2)+,(a0,a2.l)
+
+In RTL the destination's a2 is the register's value from before the
+increment (an insn's other addresses use the original value), but the
+68k works the destination out after the source's increment, so each
+byte landed one late. GFOffice's owf_number_text (libowf) showed 6.5 as
+"6.w" and pi as "3.w1415926535897" on the Amiga, and owf_booknum.c had
+"move.b (a0)+,(a0,d2.l)". A pre-decrement goes wrong the same way, in
+every move size: "move.l -(a0),(a0,d1.l)" broke glibc on m68k-linux
+(PR rtl-optimization/123853) and hung CPython (PR target/123076), and
+the DImode, DFmode and XFmode moves give "move.l -(a0),4(a0,d1.l)". It
+shows at -O2 and -O3; -fno-late-combine-instructions hid it.
+
+The non-ColdFire move insns now refuse a source that post-increments or
+pre-decrements a register the destination mentions, so the address keeps
+a register of its own: "lea (a0,a2.l),a3" and "move.b (a2)+,(a3)".
+
+This is Mikael Pettersson's patch for PR123853 (Bugzilla attachment
+64643, sent to gcc-patches as v2 on 7 July 2026), which guards the
+SImode moves. GCC has not committed it; AmigaPorts/gcc pull request 56
+(Bernie Innocenti, open) reports that upstream turned it down for future
+work that lets a back end filter an operand's registers, and that Debian
+carries it. That pull request puts the same guard on the HImode, QImode
+and SFmode moves; this patch also puts it on the DImode, DFmode and
+XFmode moves.
+
+tests/repro/autoinc.c is owf_number_text reduced, with copy loops in
+every move size; prove.sh runs it and checks its code for an instruction
+that names a register again after (An)+ or -(An). Built with this patch,
+no libowf source has one (owf_book.c and owf_booknum.c had), and those
+two instructions are the only change in libowf's code.
+---
+ gcc/config/m68k/m68k-protos.h |  1 +
+ gcc/config/m68k/m68k.cc       | 30 ++++++++++++++++++++++++++++++
+ gcc/config/m68k/m68k.md       | 18 +++++++++---------
+ 3 files changed, 40 insertions(+), 9 deletions(-)
+
+diff --git a/gcc/config/m68k/m68k-protos.h b/gcc/config/m68k/m68k-protos.h
+index 05820786e..e4bfff9ce 100644
+--- a/gcc/config/m68k/m68k-protos.h
++++ b/gcc/config/m68k/m68k-protos.h
+@@ -26,6 +26,7 @@ extern HOST_WIDE_INT m68k_initial_elimination_offset (int from, int to);
+ extern void split_di (rtx[], int, rtx[], rtx[]);
+ 
+ extern bool valid_mov3q_const (HOST_WIDE_INT);
++extern bool check_move_simode (const rtx *);
+ extern const char *output_move_simode (rtx *);
+ extern const char *output_move_himode (rtx *);
+ extern const char *output_move_qimode (rtx *);
+diff --git a/gcc/config/m68k/m68k.cc b/gcc/config/m68k/m68k.cc
+index 63c733860..10fc8b052 100644
+--- a/gcc/config/m68k/m68k.cc
++++ b/gcc/config/m68k/m68k.cc
+@@ -3346,6 +3346,36 @@ valid_mov3q_const (HOST_WIDE_INT i)
+   return TARGET_ISAB && (i == -1 || IN_RANGE (i, 1, 7));
+ }
+ 
++/* Return true if OPERANDS[] are valid for output_move_simode.
++   In particular, if SRC is a MEM with auto-inc/dec addressing and
++   its REG is mentioned in DST, it's invalid.  See PR123853.
++   The check does not depend on the mode: the HI, QI and SF move insns
++   use it too, since late-combine produces the same shape for them.
++   So do the DI, DF and XF move insns, whose two or three moves
++   (output_move_double) all address the destination after the source's
++   increment or decrement.  */
++
++bool
++check_move_simode (const rtx *operands)
++{
++  rtx src = operands[1];
++  if (MEM_P (src))
++    {
++      rtx src1 = XEXP (src, 0);
++      if (GET_CODE (src1) == PRE_DEC || GET_CODE (src1) == POST_INC)
++	{
++	  rtx src2 = XEXP (src1, 0);
++	  if (REG_P (src2))
++	    {
++	      rtx dst = operands[0];
++	      if (reg_overlap_mentioned_p (src2, dst))
++		return false;
++	    }
++	}
++    }
++  return true;
++}
++
+ /* Return an instruction to move CONST_INT OPERANDS[1] into OPERANDS[0].
+    I is the value of OPERANDS[1].  */
+ 
+diff --git a/gcc/config/m68k/m68k.md b/gcc/config/m68k/m68k.md
+index 2c0b51fb5..530eee8d1 100644
+--- a/gcc/config/m68k/m68k.md
++++ b/gcc/config/m68k/m68k.md
+@@ -993,7 +993,7 @@
+   ;; We don't allow f-regs since fixed point cannot go in them.
+   [(set (match_operand:SI 0 "nonimmediate_operand" "=g,d,a<")
+         (match_operand:SI 1 "general_src_operand" "damSnT,n,i"))]
+-  "!TARGET_COLDFIRE && reload_completed"
++  "!TARGET_COLDFIRE && reload_completed && check_move_simode (operands)"
+ {
+   return output_move_simode (operands);
+ }
+@@ -1006,7 +1006,7 @@
+   [(set (match_operand:SI 0 "nonimmediate_operand" "=g,d,a<")
+         (match_operand:SI 1 "general_src_operand" "damSKT,n,i"))]
+ 
+-  "!TARGET_COLDFIRE"
++  "!TARGET_COLDFIRE && check_move_simode (operands)"
+ {
+   return output_move_simode (operands);
+ }
+@@ -1085,7 +1085,7 @@
+ (define_insn ""
+   [(set (match_operand:HI 0 "nonimmediate_operand" "=g")
+         (match_operand:HI 1 "general_src_operand" "gS"))]
+-  "!TARGET_COLDFIRE"
++  "!TARGET_COLDFIRE && check_move_simode (operands)"
+   "* return output_move_himode (operands);"
+   [(set (attr "flags_valid")
+ 	(if_then_else (match_operand 0 "address_reg_operand")
+@@ -1131,7 +1131,7 @@
+ (define_insn ""
+   [(set (match_operand:QI 0 "nonimmediate_operand" "=d,*a,m")
+ 	(match_operand:QI 1 "general_src_operand" "dmSi*a,di*a,dmSi"))]
+-  "!TARGET_COLDFIRE"
++  "!TARGET_COLDFIRE && check_move_simode (operands)"
+   "* return output_move_qimode (operands);"
+   [(set_attr "flags_valid" "set")])
+ 
+@@ -1210,7 +1210,7 @@
+ (define_insn ""
+   [(set (match_operand:SF 0 "nonimmediate_operand" "=rmf")
+ 	(match_operand:SF 1 "general_operand" "rmfF"))]
+-  "!TARGET_COLDFIRE"
++  "!TARGET_COLDFIRE && check_move_simode (operands)"
+ {
+   if (FP_REG_P (operands[0]))
+     {
+@@ -1358,7 +1358,7 @@
+ 	(match_operand:DF 1 "general_operand" "*rf,m,0,*rfE<>,*rofE<>"))]
+ ;  [(set (match_operand:DF 0 "nonimmediate_operand" "=rm,&rf,&rof<>")
+ ;	(match_operand:DF 1 "general_operand" "rf,m,rofF<>"))]
+-  "!TARGET_COLDFIRE"
++  "!TARGET_COLDFIRE && check_move_simode (operands)"
+ {
+   if (FP_REG_P (operands[0]))
+     {
+@@ -1476,7 +1476,7 @@
+ (define_insn ""
+   [(set (match_operand:XF 0 "nonimmediate_operand" "=f,m,f,!r,!f,!r,m,!r")
+ 	(match_operand:XF 1 "nonimmediate_operand" "m,f,f,f,r,!r,!r,m"))]
+-  "TARGET_68881"
++  "TARGET_68881 && check_move_simode (operands)"
+ {
+   if (FP_REG_P (operands[0]))
+     {
+@@ -1516,7 +1516,7 @@
+ (define_insn ""
+   [(set (match_operand:XF 0 "nonimmediate_operand" "=rm,rf,&rof<>,&rf<>")
+ 	(match_operand:XF 1 "nonimmediate_operand" "rf,m,rf<>,rof<>"))]
+-  "! TARGET_68881 && ! TARGET_COLDFIRE"
++  "! TARGET_68881 && ! TARGET_COLDFIRE && check_move_simode (operands)"
+ {
+   if (FP_REG_P (operands[0]))
+     {
+@@ -1574,7 +1574,7 @@
+ ;	(match_operand:DI 1 "general_operand" "r,m,roi<>,fF"))]
+ ;  [(set (match_operand:DI 0 "nonimmediate_operand" "=rm,&rf,&ro<>,!&rm,!&f")
+ ;	(match_operand:DI 1 "general_operand" "r,m,roi<>,fF,rfF"))]
+-  "!TARGET_COLDFIRE"
++  "!TARGET_COLDFIRE && check_move_simode (operands)"
+ {
+   if (FP_REG_P (operands[0]))
+     {
+-- 
+2.43.0
+
