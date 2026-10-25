@@ -32,7 +32,9 @@ It builds the programs for ARM64 and copies the target libraries and headers,
 which are the same for every host, from the x86-64 build.
 
 `fetch.sh WORK MIRROR` clones from an earlier amiga-gcc checkout instead of
-the network. `build.sh` never fetches: when `unshare` is there it builds with
+the network. When franke.ms does not answer, `fetch.sh` tries copies of bebbo's
+repositories (`codeberg.org/bebbo`, then `github.com/AmigaPorts`) and uses one
+only if it has the pinned commit. `build.sh` never fetches: when `unshare` is there it builds with
 no network at all, so a missing source stops it.
 
 `build.sh`:

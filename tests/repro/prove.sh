@@ -102,4 +102,44 @@ for opt in -O2 -Os; do
   elif "$OBJDUMP" -d "$O/null.o" | grep -qE 'trap +#7'; then echo "[$opt] null: WRONG (trap #7)"; bad=1
   else echo "[$opt] null: right (address 0 is read, no trap #7)"; fi
 done
+
+# a move whose source post-increments or pre-decrements a register must not address
+# its destination through it: the 68k works the destination out after the step.
+# late-combine made "move.b (a2)+,(a0,a2.l)" (GFOffice's owf_number_text, 6.5 shown as "6.w")
+autoinc_code() {   # autoinc_code FILE.s: print each instruction that names a register again after (An)+ or -(An)
+  awk '/^\t[a-z]/ {
+      ops = $0; sub(/^\t[a-z][a-z0-9.]*[ \t]+/, "", ops)
+      n = 0; depth = 0; cur = ""
+      for (i = 1; i <= length(ops); i++) {
+        ch = substr(ops, i, 1)
+        if (ch == "(") depth++; else if (ch == ")") depth--
+        if (ch == "," && depth == 0) { op[++n] = cur; cur = "" } else cur = cur ch
+      }
+      op[++n] = cur
+      for (k = 1; k < n; k++)
+        if (op[k] ~ /^-\(%?(a[0-7]|sp)\)$/ || op[k] ~ /^\(%?(a[0-7]|sp)\)\+$/) {
+          r = op[k]; gsub(/[-+()%]/, "", r)
+          for (j = k + 1; j <= n; j++) if (op[j] ~ ("(^|[^a-z0-9])" r "([^a-z0-9]|$)")) { print; break }
+        }
+    }' "$1"
+}
+for c in "-m68040 m68040" "-m68000 m68000"; do
+  cpu=${c% *}; qcpu=${c#* }
+  "$CC" $cpu -O2 "$@" -c "$D/autoinc.c" -o "$O/autoinc.o" && image autoinc "$cpu" -lgcc && echo -n "[-O2 $cpu] " && run autoinc autoinc "$qcpu" || built "[-O2 $cpu] autoinc"
+  rm -f "$O/autoinc.s"
+  if ! "$CC" $cpu -O2 "$@" -S -o "$O/autoinc.s" "$D/autoinc.c"; then built "[-O2 $cpu] autoinc code"
+  elif [ -n "$(autoinc_code "$O/autoinc.s")" ]; then
+    echo "[-O2 $cpu] autoinc code: WRONG ($(autoinc_code "$O/autoinc.s" | wc -l) instructions name the stepped register again, as in $(autoinc_code "$O/autoinc.s" | head -1 | tr -d '\t'))"; bad=1
+  else echo "[-O2 $cpu] autoinc code: right (no instruction names a register again after (An)+ or -(An))"; fi
+done
+
+# vregs must leave no virtual register: strcat into a local array became an lea of
+# virtual-stack-vars + length - 600, vregs left it, and combine dropped the frame
+for opt in -O1 -O2; do
+  "$CC" -m68040 $opt "$@" -c "$D/vregs.c" -o "$O/vregs.o" && image vregs && echo -n "[$opt] " && run vregs vregs || built "[$opt] vregs"
+  rm -f "$O"/vregs.c.*.vregs
+  if ! "$CC" -m68040 $opt "$@" -fdump-rtl-vregs -dumpdir "$O/" -S -o "$O/vregs.s" "$D/vregs.c" || ! ls "$O"/vregs.c.*.vregs >/dev/null 2>&1; then built "[$opt] vregs dump"
+  elif grep -q 'virtual-' "$O"/vregs.c.*.vregs; then echo "[$opt] vregs dump: WRONG (a virtual register is left after vregs)"; bad=1
+  else echo "[$opt] vregs dump: right (no virtual register after vregs)"; fi
+done
 exit $bad
