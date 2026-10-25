@@ -15,6 +15,7 @@ git am /path/to/patches/libnix/*.patch      # or: patch -p1 < each file, in orde
 | `0005-__cxa_atexit-…` | no `__cxa_atexit` or `__dso_handle`, which C++ code built with `-fuse-cxa-atexit` (the compiler's default from gcc patch 0010) needs | `docs/cxa-atexit.md` |
 | `0006-setlocale-…` | `setlocale()` from several threads at once (libstdc++ calls it for every number a stream converts) frees the same name twice and closes the same locale twice; the saved name can't be set back | `docs/libnix-setlocale.md` |
 | `0007-cxxglue-__initcpp-…` | under `-fbaserel`/`-fbaserel32`, `__init_eh` and `__initcpp` addressed the `.list` sections (in the code hunk) from a4: `-fbaserel` C++ failed to link and `-fbaserel32` C++ hung before `main` | `tests/baserel/FINDINGS.md` |
+| `0008-strtol-strtoul-…` | empty-input conversion leaves `endptr` untouched; `strtol` also consumes an uninitialised end pointer after whitespace-only input | `docs/libnix-strtol-endptr.md`; native original/fixed control in `tests/libnix/strtol_endptr.c` |
 
 Then rebuild libnix (`make libnix` in amiga-gcc, or `Makefile.gcc6 all install`). Built with the GCC 16.2 stove at `-O2`, the unpatched source gives a `libnix20.a`, `libnix13.a` and start code byte-identical to the stove's.
 

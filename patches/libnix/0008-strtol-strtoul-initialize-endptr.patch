@@ -1,0 +1,21 @@
+--- a/sources/nix/stdlib/strtol.c
++++ b/sources/nix/stdlib/strtol.c
+@@ -8,6 +8,8 @@
+ signed long strtol(const char *nptr,char **endptr,int base)
+ { const char *p=nptr;
+-  char *q;
++  char *q=(char *)nptr;
+   unsigned long r;
++  if(endptr!=NULL)
++    *endptr=(char *)nptr;
+   if(!(nptr && *nptr))
+   { errno=EINVAL;
+--- a/sources/nix/stdlib/strtoul.c
++++ b/sources/nix/stdlib/strtoul.c
+@@ -12,4 +12,6 @@
+ 	char c = 0;
+ 	unsigned long r = 0;
++	if (endptr != NULL)
++		*endptr = (char *) nptr;
+ 	if (base < 0 || base == 1 || base > 36) {
+ 		if (endptr != NULL)
