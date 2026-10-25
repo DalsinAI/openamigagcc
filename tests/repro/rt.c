@@ -6,7 +6,7 @@ void *memcpy(void *d, const void *s, size_t n) { volatile unsigned char *a = d; 
 void *memmove(void *d, const void *s, size_t n) { volatile unsigned char *a = d; const volatile unsigned char *b = s; if (a < b) while (n--) *a++ = *b++; else { a += n; b += n; while (n--) *--a = *--b; } return d; }
 void *memset(void *d, int c, size_t n) { volatile unsigned char *a = d; while (n--) *a++ = (unsigned char)c; return d; }
 void *__bcopz(const void *s, void *d, size_t n) { return memmove(d, s, n); }
-size_t strlen(const char *s) { const volatile char *p = s; size_t n = 0; while (p[n]) n++; return n; }
+__attribute__((weak)) size_t strlen(const char *s) { const volatile char *p = s; size_t n = 0; while (p[n]) n++; return n; }
 void puts_(const char *s) { size_t n = 0; while (s[n]) n++; sys_write(s, n); }
 /* No division: a 68000 has no 32-bit divide, and no libgcc is linked. */
 void putu(unsigned long v) { static const unsigned long p[] = { 1000000000, 100000000, 10000000, 1000000, 100000, 10000, 1000, 100, 10, 1 };
