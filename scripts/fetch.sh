@@ -37,7 +37,7 @@ grep -v '^#' "$HERE/sources.lock" | while read -r name url commit dir; do
   alt=
   case $src in https://franke.ms/git/bebbo/*)
     r=${src#https://franke.ms/git/bebbo/}
-    alt="https://codeberg.org/bebbo/$r https://zff.dev/bebbo/$r https://github.com/AmigaPorts/$r" ;;
+    alt="https://codeberg.org/bebbo/$r https://github.com/AmigaPorts/$r" ;;
   esac
   if [ -d "$dest/.git" ]; then
     echo "$name: already in $dest"
