@@ -10,6 +10,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      release:
+        description: 'Publish this build as a release, e.g. 16.2.0-open4 (needs docs/releases/<version>.md); empty builds only'
+        required: false
+        default: ''
 
 concurrency:
   group: build-${{ github.ref }}
@@ -19,8 +24,14 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 300
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Room for the release tarballs
+        if: inputs.release != ''
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h "$RUNNER_TEMP"
 
       - name: Folders
         run: |
@@ -71,6 +82,24 @@ jobs:
           "$PREFIX/bin/m68k-amigaos-gcc" -m68040 -m68881 -O2 -o "$O/setlocale_threads" tests/libnix/setlocale_threads.c -lpthread -lm
           "$PREFIX/bin/m68k-amigaos-gcc" -m68040 -m68881 -O2 -o "$O/strtol_endptr" tests/libnix/strtol_endptr.c
           ls -l "$O"
+
+      - name: Package
+        if: inputs.release != ''
+        run: |
+          test -f "docs/releases/${{ inputs.release }}.md"
+          scripts/package.sh "$WORK" "$PREFIX" "$RUNNER_TEMP/out" "${{ inputs.release }}"
+          ls -l "$RUNNER_TEMP/out"
+
+      - name: Publish the release
+        if: inputs.release != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ inputs.release }}
+        run: |
+          gh release create "v$V" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "OpenAmigaGCC $V" --notes-file "docs/releases/$V.md" \
+            "$RUNNER_TEMP/out/openamigagcc-$V-x86_64-linux.tar.xz" \
+            "$RUNNER_TEMP/out/openamigagcc-$V-src.tar.xz" "$RUNNER_TEMP/out/SHA256SUMS"
 
       - name: Logs
         if: failure()
