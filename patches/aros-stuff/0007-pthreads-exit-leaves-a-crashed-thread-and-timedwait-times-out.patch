@@ -1,0 +1,134 @@
+pthreads: exit leaves a crashed thread, and a past time is a timeout at once
+
+At exit, __pthread_Exit_Func joins every thread so that no code is unloaded
+under one that still runs. A thread that crashed never ends: exec's trap
+handling (Kickstart's default trap code, OpenKick's included) sends a task
+that took a CPU exception to Wait(0) for good, and the thread's finished
+flag is never set. The join then waited for ever, and the program never
+returned to the Shell. OpenBrowser's obcore-view hung this way on reddit.com
+whenever reCAPTCHA's Web Worker thread crashed (WTFCrash: a write to
+0xBBADBEEF, then a trap).
+
+Exit now joins through ExitJoin(). It checks the thread every two ticks
+(Delay(2)), under thread_sem:
+- ended: joined as before;
+- not started yet: waits for it to start;
+- its task in TS_WAIT with tc_SigWait 0: left behind. No Signal() can wake
+  a Wait(0), so the task never runs again and the code unloaded under it is
+  never reached. Its task and stack are not freed.
+finished is set under thread_sem before a thread's task goes, so while
+finished is clear the task is still there to look at. A thread that crashes
+while exit waits for it is caught on the next check.
+
+pthread_cond_timedwait with an absolute time already past (or now) waited
+for ever. The time is turned into an interval for timer.device by
+subtracting gettimeofday(), and timer.device takes the interval as
+unsigned, so a negative one never ended. WTF::sleep() (WebKit's
+ParkingLot, through ThreadCondition::timedWait) never returned on the
+Amiga because of this. A negative or zero interval is now one microsecond,
+so the wait times out at once.
+
+tests/pthreads/exitpark.c shows both. On a lab copy of Instance-32
+(OpenKick, AC090), built against 0001-0006 and against 0001-0007:
+
+| case | 0001-0006 | 0001-0007 |
+|---|---|---|
+| a thread crashes (write to 0xBBADBEEF, then a trap); main returns | no return (x1) | returned, RC 0 (x4) |
+| a thread ends; exit joins it | returned | returned |
+| timedwait, absolute time 2 s in the past | never returned | ETIMEDOUT after 0 ms |
+| timedwait, 200 ms ahead | not reached | ETIMEDOUT after 200 ms |
+
+joinsig.c (0006) still passes with 0007.
+
+zlib licence, as aros-stuff's pthreads (README, docs/install.md). Copyright (c) 2026 AmigaChrome Team.
+---
+diff --git a/pthreads/pthread.c b/pthreads/pthread.c
+index 3761644..5549de2 100644
+--- a/pthreads/pthread.c
++++ b/pthreads/pthread.c
+@@ -754,6 +754,14 @@ static int _pthread_cond_timedwait(pthread_cond_t *cond, pthread_mutex_t *mutex,
+ 			gettimeofday(&starttime, NULL);
+ 			timersub(&timerio.tr_time, &starttime, &timerio.tr_time);
+ 		}
++		// A time already past (or now) is a timeout at once. timer.device takes the
++		// interval as unsigned: a negative one (an absolute time that has gone by,
++		// as a short wait computed a moment earlier often is) waited for ever.
++		if ((LONG)timerio.tr_time.tv_secs < 0 || (LONG)timerio.tr_time.tv_micro < 0
++			|| (!timerio.tr_time.tv_secs && !timerio.tr_time.tv_micro)) {
++			timerio.tr_time.tv_secs = 0;
++			timerio.tr_time.tv_micro = 1;
++		}
+ 		timermask = 1 << timermp.mp_SigBit;
+ 		sigs |= timermask;
+ 		SendIO((struct IORequest*) &timerio);
+@@ -2151,6 +2159,61 @@ int __pthread_Init_Func(void) {
+ 	return TRUE;
+ }
+ 
++#if defined(__MORPHOS__) || defined(__AMIGA__)
++/* A crashed thread never ends: exec's trap handling (the default trap code of
++   Kickstart, as of OS 3.2's exec and OpenKick) sends a task that took a CPU
++   exception to Wait(0) for good, and its finished flag is never set. Joining
++   it at exit waited for ever, so the program never returned to the Shell.
++   Exit leaves such a thread instead: its task is in TS_WAIT waiting for no
++   signal, so no Signal() can wake it and it never runs again, and the code
++   unloaded under it is never reached. Its task and stack are not freed.
++   finished and the task's state are read under thread_sem: a thread sets
++   finished under thread_sem before its task goes, so the task is still there
++   while finished is clear. The thread is checked every two ticks while it
++   runs, so one that crashes during the wait is left as well. */
++static int TaskParked(struct Task *t)
++{
++	int parked;
++
++	Disable();
++	parked = t->tc_State == TS_WAIT && t->tc_SigWait == 0;
++	Enable();
++	return parked;
++}
++
++static void ExitJoin(pthread_t thread)
++{
++	for (;;) {
++		ThreadInfo *inf;
++		int parked;
++
++		ObtainSemaphore(&thread_sem);
++		inf = GetThreadInfo(thread);
++		if (inf == NULL || !inf->task) {
++			ReleaseSemaphore(&thread_sem);
++			return;
++		}
++		if (inf->started && inf->finished) {
++			ReleaseSemaphore(&thread_sem);
++			break;
++		}
++		if (!inf->started) {		// still in creation: wait for it to start
++			ReleaseSemaphore(&thread_sem);
++			Delay(2);
++			continue;
++		}
++		parked = TaskParked(inf->task);
++		ReleaseSemaphore(&thread_sem);
++		if (parked) {
++			D(bug("%s(%ld): its task is parked after a crash, left behind\n", __FUNCTION__, thread));
++			return;
++		}
++		Delay(2);
++	}
++	pthread_join(thread, NULL);
++}
++#endif
++
+ #ifndef __AMIGA__
+ static
+ #endif
+@@ -2174,7 +2237,7 @@ void __pthread_Exit_Func(void) {
+ 		ThreadInfo *inf = GetThreadInfo(i);
+ 		inf->attr.detachstate = PTHREAD_CREATE_JOINABLE; // force it to be joinable or waiting may fail.
+ 		ReleaseSemaphore(&thread_sem);
+-		pthread_join(i, NULL);
++		ExitJoin(i);
+ 	}
+ 
+ #endif

@@ -19,3 +19,14 @@ m68k-amigaos-gcc -m68040 -specs=../../build/m68k-soft-m68040.specs -O2 -Wall -o 
 ```
 
 It prints PASS or FAIL for each case, then `joinsig OK` (rc 0) or `joinsig FAILED` (rc 20). With the stove's library (0001-0004) the six Ctrl-F cases fail; with 0006 every case passes.
+
+`exitpark.c` (`patches/aros-stuff/0007`): exit and a crashed thread, and `pthread_cond_timedwait`'s timeout.
+- `exitpark crash`: a thread writes to 0xBBADBEEF and traps, as WTFCrash does. Exec's trap handling parks its task in `Wait(0)`. `main` then returns, and the program must return to the Shell; before 0007 it waited at exit for ever.
+- `exitpark join`: a thread that ends normally is still joined at exit.
+- `exitpark timed`: a timed wait for an absolute time 2 s in the past must give `ETIMEDOUT` at once (before 0007 it never returned), and one 200 ms ahead must give `ETIMEDOUT` after about 200 ms. It prints `EXITPARK timed PASS` (rc 0) or `FAIL` (rc 10).
+
+```bash
+m68k-amigaos-gcc -O2 -m68040 -noixemul -o exitpark exitpark.c -lpthread
+```
+
+Run it on an Amiga whose trap handling parks a crashed task (OpenKick does; Kickstart's own shows a requester first), with `Run`, and check that the Shell gets `RC` back.
