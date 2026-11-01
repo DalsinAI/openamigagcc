@@ -111,24 +111,25 @@ for f in bin/m68k-amigaos-gprof m68k-amigaos/ndk-include/exec/types.h m68k-amiga
 done
 
 # 5b. libamiga.a, from OpenNDK (projects/openamigasdk, pinned in
-#     scripts/sources.lock), in every multilib folder: plain for the plain
-#     ones, -fbaserel for libb and -fbaserel32 for libb32. Each old file is
+#     scripts/sources.lock), in every multilib folder, each built with that
+#     multilib's own flags: "libm020/libm881;@mcpu=68020@m68881" gets
+#     -mcpu=68020 -m68881, "libb;@fbaserel" -fbaserel. OpenNDK's lib/build.sh puts
+#     -m68040 first, so a multilib that names no CPU gets -m68000 (this
+#     GCC's default) after it: the last CPU flag wins. Each old file is
 #     removed first, so a link to it (a stove's) is replaced, never written
 #     through. docs/openndk-libamiga.md.
 say "libamiga.a from OpenNDK"
 OPENNDK=$WORK/projects/openamigasdk/OpenNDK
 T=$PREFIX/m68k-amigaos
-for kind in plain baserel baserel32; do
-  case $kind in plain) fl= ;; baserel) fl=-fbaserel ;; baserel32) fl=-fbaserel32 ;; esac
-  ( PREFIX="$PREFIX/bin/m68k-amigaos-" EXTRA_CFLAGS="$fl" sh "$OPENNDK/lib/build.sh" ) > "$LOGS/openndk-libamiga-$kind.log" 2>&1 \
-    || { echo "OpenNDK's libamiga.a ($kind) failed (see $LOGS/openndk-libamiga-$kind.log)"; exit 1; }
-  cp "$OPENNDK/lib/build/m68k-amigaos/libamiga.a" "$LOGS/libamiga-$kind.a"
-done
-"$PREFIX/bin/m68k-amigaos-gcc" -print-multi-lib | while IFS=';' read -r dir _; do
-  case $dir in libb32*) kind=baserel32 ;; libb*) kind=baserel ;; *) kind=plain ;; esac
+"$PREFIX/bin/m68k-amigaos-gcc" -print-multi-lib | while IFS=';' read -r dir flags; do
+  fl=${flags//@/ -}
+  case " $fl " in *" -mcpu="*|*" -m680"[0-6]"0 "*) ;; *) fl="-m68000$fl" ;; esac
+  log=$LOGS/openndk-libamiga-$([ "$dir" = . ] && echo plain || echo "${dir//\//-}").log
+  ( PREFIX="$PREFIX/bin/m68k-amigaos-" EXTRA_CFLAGS="$fl" sh "$OPENNDK/lib/build.sh" ) > "$log" 2>&1 \
+    || { echo "OpenNDK's libamiga.a for multilib '$dir' ($fl) failed (see $log)"; exit 1; }
   mkdir -p "$T/lib/$dir"
   rm -f "$T/lib/$dir/libamiga.a"
-  cp "$LOGS/libamiga-$kind.a" "$T/lib/$dir/libamiga.a"
+  cp "$OPENNDK/lib/build/m68k-amigaos/libamiga.a" "$T/lib/$dir/libamiga.a"
 done
 
 # 6. libgcc, libstdc++ and the other target libraries, against libnix's
@@ -210,6 +211,22 @@ done < <(find "$PREFIX/m68k-amigaos" "$PREFIX/lib" -name 'libamiga.a' -not -path
 "$CC" -print-multi-lib | while IFS=';' read -r dir flags; do
   got=$("$CC" ${flags//@/ -} -print-file-name=libamiga.a)
   [ "$(readlink -f "$got")" = "$(readlink -f "$T/lib/$dir/libamiga.a")" ] || { echo "multilib '$dir' links $got, not its own libamiga.a"; exit 1; }
+done
+# The 68000 multilibs' libamiga.a (every one that names no 68020 or later)
+# has nothing a 68000 lacks: no address objdump's 68000 table can't decode
+# (".short") where its 68040 table finds an instruction (mulu.l, tst.l An,
+# ...; strings in .text are ".short" to both), and no scaled index or
+# memory indirection.
+m68kdis() { # CPU LIB: "object/address S|I" for every word objdump shows
+  "$PREFIX/bin/m68k-amigaos-objdump" -d -m "m68k:$1" "$2" \
+    | awk '/file format/ { f = $1 } /^ +[0-9a-f]+:/ { print f "/" $1, (/\.short/ ? "S" : "I") }'
+}
+"$CC" -print-multi-lib | while IFS=';' read -r dir flags; do
+  case "$flags" in *680[2-6]0*) continue ;; esac
+  a=$T/lib/$dir/libamiga.a
+  bad=$(join <(m68kdis 68000 "$a" | awk '$2 == "S" { print $1 }' | sort) <(m68kdis 68040 "$a" | awk '$2 == "I" { print $1 }' | sort)
+        "$PREFIX/bin/m68k-amigaos-objdump" -d -m m68k:68000 "$a" | grep -E '^ +[0-9a-f]+:.*(:[wl]:[248]\)|\)@\()' || true)
+  [ -z "$bad" ] || { echo "multilib '$dir' libamiga.a has 68020+ code:"; echo "$bad" | head -5; exit 1; }
 done
 printf '#include <proto/exec.h>\n#include <clib/alib_protos.h>\nint main(void) { struct List l; NewList(&l); return IsListEmpty(&l) ? 0 : 1; }\n' > "$C/alib.c"
 "$CC" -m68040 -O2 -I"$OPENNDK/Include_H" -o "$C/alib" "$C/alib.c" -Wl,-Map,"$C/alib.map"
