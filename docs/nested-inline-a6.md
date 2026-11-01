@@ -12,7 +12,7 @@ if (Stricmp(FilePart(name), "frame.config") == 0)
 
 `Stricmp` ran with `DOSBase` in A6, so `jsr -162(a6)` called dos.library's
 vector at -162 instead of utility.library's `Stricmp`. Zune's datatypes cache
-(OpenUp 0.7.4) and OpenTypes hit it on 9 and 11 October; AmigaPorts saw it in
+(GFOpenUp 0.7.4) and GFOpenTypes hit it on 9 and 11 October; AmigaPorts saw it in
 dopus5 as `RawDoFmt(GetString(...))`.
 
 It is in the headers, not in the compiler. sfdc writes the NDK's GCC inlines
@@ -63,7 +63,7 @@ arguments`, `sfdc: A6 now bound after the arguments`.
 called with. `tests/repro/prove.sh` runs it at `-O1`, `-O2` and `-Os`.
 
 The results below were taken with GCC 14 (m68k-linux under qemu-m68k) and
-headers made by bebbo's sfdc; CI runs it with OpenAmigaGCC itself.
+headers made by bebbo's sfdc; CI runs it with GFOpenAmigaGCC itself.
 
 | Headers | Result |
 | --- | --- |

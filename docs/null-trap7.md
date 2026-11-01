@@ -7,7 +7,7 @@ GCC assumes nothing lives there. At `-O2` and `-Os` it replaces a read through
 a pointer it has proved null with `trap #7`, which AmigaOS reports as Software
 Failure 80000027, and it drops null checks that follow a read.
 
-OpenAmigaGCC's driver adds `-fno-delete-null-pointer-checks` unless a build
+GFOpenAmigaGCC's driver adds `-fno-delete-null-pointer-checks` unless a build
 passes `-fdelete-null-pointer-checks`. The default is built into the driver
 (`DRIVER_SELF_SPECS`), not a `specs` file: a `specs` file beside libgcc
 replaced the driver's `-mcrt` link setup, and programs lost libnix.
@@ -20,4 +20,4 @@ replaced the driver's `-mcrt` link setup, and programs lost libnix.
 | Compiler | `-O2` | `-Os` |
 | --- | --- | --- |
 | GCC 16.2.0b as released | wrong: `trap #7` | wrong: `trap #7` |
-| OpenAmigaGCC | right: address 0 is read | right |
+| GFOpenAmigaGCC | right: address 0 is read | right |

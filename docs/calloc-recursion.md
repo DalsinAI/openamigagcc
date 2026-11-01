@@ -18,7 +18,7 @@ optimisations everywhere.
   inlined from one.
 - A new option, `-fmalloc-memset-to-calloc` (on by default in GCC), turns the
   transform off as `-fno-malloc-memset-to-calloc`.
-- OpenAmigaGCC's driver passes `-fno-malloc-memset-to-calloc` unless a build
+- GFOpenAmigaGCC's driver passes `-fno-malloc-memset-to-calloc` unless a build
   asks for the positive form, so allocators stay as written.
 
 ## Reproducer
@@ -29,5 +29,5 @@ and counts calloc's depth.
 | Compiler | run | code |
 | --- | --- | --- |
 | GCC 16.2.0b as released (`-O2`) | wrong: calloc called itself | `jsr _calloc` inside `_calloc` |
-| OpenAmigaGCC (`-O2`) | right | no call |
-| OpenAmigaGCC with `-fmalloc-memset-to-calloc` | right | no call |
+| GFOpenAmigaGCC (`-O2`) | right | no call |
+| GFOpenAmigaGCC with `-fmalloc-memset-to-calloc` | right | no call |

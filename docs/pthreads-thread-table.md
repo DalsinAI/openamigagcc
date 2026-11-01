@@ -26,7 +26,7 @@ The table is an array of `PTHREAD_THREADS_MAX` pointers (8 KB), allocated once. 
 
 ## Results
 
-Instance-32 (AmigaOS 3.2 on AmigaChrome), 11 October 2026. Each run was started with `Run`, 3 seconds apart, after a reset:
+Instance-32 (AmigaOS 3.2 on AmiCradle), 11 October 2026. Each run was started with `Run`, 3 seconds apart, after a reset:
 
 | t3 linked with | Runs | `t3 OK` |
 | --- | ---: | ---: |

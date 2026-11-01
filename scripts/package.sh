@@ -4,7 +4,7 @@
 # (PREFIX without the NDK you supplied), OUT/openamigagcc-VERSION-src.tar.xz (amiga-gcc's
 # framework and its modules as built, with this repository) and OUT/SHA256SUMS.
 # It stops if either tarball would carry an NDK folder, an amiga.lib or a libamiga.a that is not
-# OpenNDK's (docs/openndk-libamiga.md).
+# GFOpenNDK's (docs/openndk-libamiga.md).
 # GPL-3.0-or-later. Copyright (c) 2026 AmigaChrome Team.
 set -euo pipefail
 WORK=$(cd "$1" && pwd); PREFIX=$(cd "$2" && pwd); mkdir -p "$3"; OUT=$(cd "$3" && pwd); V=$4
@@ -24,15 +24,15 @@ rsync -a --no-group --exclude '.git' --exclude '/build-*/' --exclude '/download/
   "$WORK/" "$S/$SRC/amiga-gcc/"
 rsync -a --no-group --exclude '.git' --exclude '__pycache__' "$HERE/" "$S/$SRC/openamigagcc/"
 
-# Nothing of the NDK, and every libamiga.a OpenNDK's.
+# Nothing of the NDK, and every libamiga.a GFOpenNDK's.
 bad=$(cd "$S" && find . \( -path '*/projects/NDK3.2*' -o -name 'NDK3.2.lha' -o -iname 'amiga.lib' -o -name 'ndk-include' -o -name 'ndk13-include' \) -print | head -5)
 [ -z "$bad" ] || { echo "NDK files in the release: $bad"; exit 1; }
 n=0
 while IFS= read -r a; do
-  "$PREFIX/bin/m68k-amigaos-ar" t "$a" | grep -qx rexxvar.o || { echo "${a#"$S"/} is not OpenNDK's libamiga.a"; exit 1; }
+  "$PREFIX/bin/m68k-amigaos-ar" t "$a" | grep -qx rexxvar.o || { echo "${a#"$S"/} is not GFOpenNDK's libamiga.a"; exit 1; }
   n=$((n+1))
 done < <(find "$S" -name 'libamiga.a')
-echo "libamiga.a: $n in the release, all OpenNDK's"
+echo "libamiga.a: $n in the release, all GFOpenNDK's"
 
 ( cd "$S" && tar --owner=0 --group=0 -cJf "$OUT/$BIN.tar.xz" "$BIN" && tar --owner=0 --group=0 -cJf "$OUT/$SRC.tar.xz" "$SRC" )
 ( cd "$OUT" && sha256sum "$BIN.tar.xz" "$SRC.tar.xz" > SHA256SUMS && cat SHA256SUMS )

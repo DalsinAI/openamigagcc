@@ -43,7 +43,7 @@ GCC has not committed it.
 [AmigaPorts/gcc #56](https://github.com/AmigaPorts/gcc/pull/56) (open), which
 puts the same guard on the 16-bit, 8-bit and `float` moves, reports that
 upstream turned it down for future work that lets a back end filter an
-operand's registers, and that Debian carries it. OpenAmigaGCC also puts the
+operand's registers, and that Debian carries it. GFOpenAmigaGCC also puts the
 guard on the 64-bit and 96-bit moves.
 
 ## Reproducer
@@ -56,8 +56,8 @@ after `(An)+` or `-(An)`.
 
 | Compiler | `-O2 -m68040` code | `-O2 -m68000` code |
 | --- | --- | --- |
-| GCC 16.2.0b as released (OpenAmigaGCC 16.2.0-open3) | wrong: 21 instructions, `move.b (a5)+,(a2,a5.l)` in `fmt` among them | wrong: 20 instructions |
-| OpenAmigaGCC with patch 0013 | right: none | right: none |
+| GCC 16.2.0b as released (GFOpenAmigaGCC 16.2.0-open3) | wrong: 21 instructions, `move.b (a5)+,(a2,a5.l)` in `fmt` among them | wrong: 20 instructions |
+| GFOpenAmigaGCC with patch 0013 | right: none | right: none |
 
 GFOffice's libowf (its 41 sources, built as owf.library is): with patch 0013
 no instruction names a stepped register again, and the two that did are the

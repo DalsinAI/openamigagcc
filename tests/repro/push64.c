@@ -1,7 +1,7 @@
 /* 64-bit libcall arguments pushed from stack slots (-m68040/-m68060 tuning,
    no frame pointer): (s64)m * 4294967296 / det pushes 0 and then m's low
    word; that second push must not read 4 bytes too low.
-   The arithmetic is OpenGPU's affine compositing, reduced. */
+   The arithmetic is GFOpenGPU's affine compositing, reduced. */
 typedef long long s64;
 extern void puts_(const char *); extern void puti(long);
 volatile long M[6] = { 0x18000, 0x6000, 0x30000, -0x4000, 0x14000, 0x20000 };

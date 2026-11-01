@@ -29,4 +29,4 @@ It prints PASS or FAIL for each case, then `joinsig OK` (rc 0) or `joinsig FAILE
 m68k-amigaos-gcc -O2 -m68040 -noixemul -o exitpark exitpark.c -lpthread
 ```
 
-Run it on an Amiga whose trap handling parks a crashed task (OpenKick does; Kickstart's own shows a requester first), with `Run`, and check that the Shell gets `RC` back.
+Run it on an Amiga whose trap handling parks a crashed task (GFOpenKick does; Kickstart's own shows a requester first), with `Run`, and check that the Shell gets `RC` back.

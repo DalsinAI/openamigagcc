@@ -1,6 +1,6 @@
 # AmigaOS 4.1 (`ppc-amigaos`): not yet in a release
 
-OpenAmigaGCC's releases so far hold only the `m68k-amigaos` compiler. The Team's
+GFOpenAmigaGCC's releases so far hold only the `m68k-amigaos` compiler. The Team's
 GCC 16.2 for AmigaOS 4.1 on PowerPC exists as a recipe and as a built stove, but
 it is not part of 16.2.0-open2 or any other release here yet.
 
@@ -13,7 +13,7 @@ it is not part of 16.2.0-open2 or any other release here yet.
   AmigaLabs' adtools (`binutils/2.40` at `063184c1`, `gcc/15` at `87ac263c`).
   clib2 (`1a42c693`, BSD 3-Clause) and clib4 (`30e487d2`, BSD 3-Clause; it also
   carries `LICENSE-GPL` and `LICENSE-OPENLIBM`) built from source. `-mcrt=` picks newlib, clib2 or clib4.
-- **The stove:** amigachrome's `scripts/build_os4_stove.sh` (amigachrome #496,
+- **The stove:** amigachrome's `scripts/build_os4_stove.sh` (amicradle #496,
   merged) runs the recipe into Cradle's Stoves folder as ACKitchen's `os4` stove.
   Until amigachrome-stoves #8 is merged, it needs
   `OS4_STOVE_REF=origin/team3/os4-gcc16`, because `origin/main` has no
@@ -22,7 +22,7 @@ it is not part of 16.2.0-open2 or any other release here yet.
   from recipe `cc1452c` with Hyperion's SDK 54.25. Every smoke test passed: C
   with newlib, clib2 and clib4; C++ with newlib and clib2; a device-style link;
   and `-mbaserel` with clib2. The compiler reports itself as
-  `ppc-amigaos-gcc (AmigaChrome os4-gcc16) 16.2.0`; binutils as 2.47.
+  `ppc-amigaos-gcc (AmiCradle os4-gcc16) 16.2.0`; binutils as 2.47.
 - **Not yet tested:** programs running on AmigaOS 4.1. The recipe's README says
   run-time tests on an AC460 come next.
 
@@ -63,7 +63,7 @@ redistribute. The user downloads it and puts it in place, as with the AmigaOS
    it takes `SDK_54.25.lha` (or later), checks it, and puts it where the
    compiler looks.
 5. **A version string for the release.** The stove's compiler says
-   `AmigaChrome os4-gcc16`; a release build would name the OpenAmigaGCC release.
+   `AmiCradle os4-gcc16`; a release build would name the GFOpenAmigaGCC release.
 6. **Run-time tests on AmigaOS 4.1:** the smoke tests run on an AC460, at least
    for newlib, clib2 and clib4, C and C++.
 7. **The decision to publish,** and where: in this repository's next release,

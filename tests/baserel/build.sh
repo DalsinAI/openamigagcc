@@ -2,13 +2,13 @@
 # Copyright (c) 2026 AmigaChrome Team. GPL-3.0-or-later, like the patches it goes with.
 # Base-relative C++ with the os32-gcc16 stove: t3_threads.cpp (amigachrome-stoves
 # os32-gcc16/tests/src) built three ways.
-#   build.sh [OUT]     STOVE: a stove folder with prefix/ and compat/ (default ~/AmigaChrome/stoves/os32-gcc16)
+#   build.sh [OUT]     STOVE: a stove folder with prefix/ and compat/ (default ~/AmiCradle/stoves/os32-gcc16)
 #   t3-plain   links and runs (control)
 #   t3-b32     -fbaserel32 (with compat/libb32): links ("out of range" lines remain), t3 OK with libnix 0007 + aros-stuff 0005
 #   t3-b16     -fbaserel (with compat/libb): links and prints t3 OK with the same patches
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd)
-STOVE=${STOVE:-$HOME/AmigaChrome/stoves/os32-gcc16}
+STOVE=${STOVE:-$HOME/AmiCradle/stoves/os32-gcc16}
 OUT=${1:-$HERE/out}
 P=$STOVE/prefix/bin/m68k-amigaos-
 WRAP="-los32compat -Wl,--wrap=malloc -Wl,--wrap=calloc -Wl,--wrap=realloc -Wl,--wrap=free -Wl,-u,___wrap_malloc -Wl,-u,___wrap_free -Wl,-u,___wrap_calloc -Wl,-u,___wrap_realloc"

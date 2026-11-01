@@ -33,9 +33,9 @@ address uses.
 `tests/repro/fpcr.c` scatters `(int)f[i]` into `out[*ix++]`.
 `tests/repro/prove.sh` runs it under `qemu-m68k -cpu m68040` and also scans
 the object for a store through the saved register, as `fpcr_check.py` does in
-the Open family's builds.
+the GFOpen family's builds.
 
 | Compiler | `-O1 -m68040` | `-O2 -m68040` |
 | --- | --- | --- |
 | GCC 16.2.0b as released | wrong: 64 of 64 values misplaced | wrong: 64 of 64 |
-| OpenAmigaGCC | right | right |
+| GFOpenAmigaGCC | right | right |

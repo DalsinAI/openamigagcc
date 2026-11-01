@@ -51,8 +51,8 @@ virtual register.
 
 | Compiler | `-O1` vregs dump | `-O2` vregs dump |
 | --- | --- | --- |
-| GCC 16.2.0b as released (OpenAmigaGCC 16.2.0-open3) | wrong: `virtual-stack-vars` left | wrong: `virtual-stack-vars` left |
-| OpenAmigaGCC with patch 0014 | right: none | right: none |
+| GCC 16.2.0b as released (GFOpenAmigaGCC 16.2.0-open3) | wrong: `virtual-stack-vars` left | wrong: `virtual-stack-vars` left |
+| GFOpenAmigaGCC with patch 0014 | right: none | right: none |
 
 GFOffice's `tests/library/owf_lib_checks.c`, built as OWFLibTest is (without
 `-fno-builtin-strcat`): its vregs dump has no virtual register, and the copy's

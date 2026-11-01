@@ -2,10 +2,10 @@ pthreads: exit leaves a crashed thread, and a past time is a timeout at once
 
 At exit, __pthread_Exit_Func joins every thread so that no code is unloaded
 under one that still runs. A thread that crashed never ends: exec's trap
-handling (Kickstart's default trap code, OpenKick's included) sends a task
+handling (Kickstart's default trap code, GFOpenKick's included) sends a task
 that took a CPU exception to Wait(0) for good, and the thread's finished
 flag is never set. The join then waited for ever, and the program never
-returned to the Shell. OpenBrowser's obcore-view hung this way on reddit.com
+returned to the Shell. GFOpenBrowser's obcore-view hung this way on reddit.com
 whenever reCAPTCHA's Web Worker thread crashed (WTFCrash: a write to
 0xBBADBEEF, then a trap).
 
@@ -29,7 +29,7 @@ Amiga because of this. A negative or zero interval is now one microsecond,
 so the wait times out at once.
 
 tests/pthreads/exitpark.c shows both. On a lab copy of Instance-32
-(OpenKick, AC090), built against 0001-0006 and against 0001-0007:
+(GFOpenKick, AC090), built against 0001-0006 and against 0001-0007:
 
 | case | 0001-0006 | 0001-0007 |
 |---|---|---|
@@ -67,7 +67,7 @@ index 3761644..5549de2 100644
  
 +#if defined(__MORPHOS__) || defined(__AMIGA__)
 +/* A crashed thread never ends: exec's trap handling (the default trap code of
-+   Kickstart, as of OS 3.2's exec and OpenKick) sends a task that took a CPU
++   Kickstart, as of OS 3.2's exec and GFOpenKick) sends a task that took a CPU
 +   exception to Wait(0) for good, and its finished flag is never set. Joining
 +   it at exit waited for ever, so the program never returned to the Shell.
 +   Exit leaves such a thread instead: its task is in TS_WAIT waiting for no

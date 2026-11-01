@@ -1,4 +1,4 @@
-# Building OpenAmigaGCC
+# Building GFOpenAmigaGCC
 
 The recipe builds GCC 16.2 for `m68k-amigaos` with binutils, libnix,
 libpthread, libgcc and libstdc++, from bebbo's amiga-gcc line at pinned

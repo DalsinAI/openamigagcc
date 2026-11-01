@@ -4,7 +4,7 @@ Date: Mon, 12 Oct 2026 08:32:35 +0100
 Subject: [PATCH] __cxa_atexit and __dso_handle: C++ destructors registered the
  standard way
 
-OpenAmigaGCC's GCC defaults to -fuse-cxa-atexit for m68k-amigaos (gcc
+GFOpenAmigaGCC's GCC defaults to -fuse-cxa-atexit for m68k-amigaos (gcc
 patch 0010), so that thread_local destructors run. Code built so calls
 __cxa_atexit(dtor, obj, &__dso_handle) for every static object with a
 destructor; libnix had neither symbol.
@@ -30,7 +30,7 @@ index 0000000..bf659ce
 @@ -0,0 +1,7 @@
 +/* __dso_handle: the C++ ABI's handle for this program image. GCC passes its
 +   address to __cxa_atexit() and __cxa_thread_atexit() for every static or
-+   thread_local object with a destructor (-fuse-cxa-atexit, OpenAmigaGCC's
++   thread_local object with a destructor (-fuse-cxa-atexit, GFOpenAmigaGCC's
 +   default for m68k-amigaos). Only its address matters. It is an archive
 +   member of its own, so a program that defines __dso_handle itself still
 +   links. */
@@ -87,7 +87,7 @@ index c7ca576..ff5865b 100644
 +{ return __addexit(func,NULL,NULL); }
 +
 +/* The C++ ABI's registration of a static object's destructor: GCC calls it
-+   with -fuse-cxa-atexit, OpenAmigaGCC's default for m68k-amigaos. A program
++   with -fuse-cxa-atexit, GFOpenAmigaGCC's default for m68k-amigaos. A program
 +   is one image, so dso (&__dso_handle) needs no bookkeeping. */
 +int __cxa_atexit(void (*func)(void *), void *arg, void *dso)
 +{ (void)dso;

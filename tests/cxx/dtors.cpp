@@ -9,7 +9,7 @@
 //   - static objects and an atexit() function: called at exit in the
 //     reverse order of their registration.
 // The last function called at exit prints "dtors OK" when the order is
-// right, or "dtors FAILED" with what ran. Before OpenAmigaGCC's gcc 0010 and
+// right, or "dtors FAILED" with what ran. Before GFOpenAmigaGCC's gcc 0010 and
 // libnix 0005 no thread_local destructor ran, and the static objects were
 // destroyed after every atexit() function, the last one included:
 // "thread_local destroyed when its thread ended: no", "dtors FAILED: g".
