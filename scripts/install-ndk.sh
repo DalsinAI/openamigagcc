@@ -1,12 +1,12 @@
 #!/bin/bash
 # install-ndk.sh SRC PREFIX NDK3.2.lha
-# Puts the AmigaOS 3.2 NDK into an OpenAmigaGCC toolchain at PREFIX: its
+# Puts the AmigaOS 3.2 NDK into a GFOpenAmigaGCC toolchain at PREFIX: its
 # headers into m68k-amigaos/ndk-include (with proto/, inline/ and lvo/ made
 # from its SFD files), the 1.3 set into ndk13-include, FD/SFD/link libraries
 # into m68k-amigaos/ndk, and Roadshow's network headers beside them.
-#   SRC   the amiga-gcc folder of the OpenAmigaGCC source release
+#   SRC   the amiga-gcc folder of the GFOpenAmigaGCC source release
 #   NDK3.2.lha  the NDK archive you have (Aminet dev/misc/NDK3.2.lha); it is
-#               not free software and is not part of OpenAmigaGCC
+#               not free software and is not part of GFOpenAmigaGCC
 # Needs lha (lhasa), a host C compiler (for fd2sfd and fd2pragma), make, rsync.
 # GPL-3.0-or-later. Copyright (c) 2026 AmigaChrome Team.
 set -euo pipefail

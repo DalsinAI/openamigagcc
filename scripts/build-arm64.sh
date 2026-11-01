@@ -1,6 +1,6 @@
 #!/bin/bash
 # build-arm64.sh WORK X86PREFIX ARMPREFIX TARBALLS [JOBS]
-# OpenAmigaGCC for ARM64 Linux hosts, as a Canadian cross on an x86-64 Linux
+# GFOpenAmigaGCC for ARM64 Linux hosts, as a Canadian cross on an x86-64 Linux
 # system: build x86_64-pc-linux-gnu, host aarch64-linux-gnu, target m68k-amigaos.
 #   WORK       the work folder scripts/build.sh built from (patched sources)
 #   X86PREFIX  that x86-64 build: its target libraries (libgcc, libstdc++,
@@ -82,4 +82,4 @@ find "$ARM" -type f -exec file {} + | grep 'ELF.*aarch64' | cut -d: -f1 | xargs 
 left=$(find "$ARM" -type f -exec file {} + | grep -E 'ELF.*x86-64' | cut -d: -f1 || true)
 if [ -n "$left" ]; then echo "x86-64 programs left in $ARM:"; echo "$left"; exit 1; fi
 echo "ARM64 programs: $(find "$ARM" -type f -exec file {} + | grep -c 'ELF.*aarch64')"
-echo "OpenAmigaGCC for ARM64 in $ARM"
+echo "GFOpenAmigaGCC for ARM64 in $ARM"

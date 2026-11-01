@@ -1,6 +1,6 @@
-# Lean C++ for the Open family
+# Lean C++ for the GFOpen family
 
-The Open family's libraries and apps can be written in C++ with this compiler. On a 68040 at 25 MHz every kilobyte and every start-up step shows, so our C++ is a lean subset: what C++ gives at compile time (classes, templates, `constexpr`, RAII, `enum class`, namespaces, overloading, lambdas, virtual functions) and none of the runtime machinery that needs setting up before code can run.
+The GFOpen family's libraries and apps can be written in C++ with this compiler. On a 68040 at 25 MHz every kilobyte and every start-up step shows, so our C++ is a lean subset: what C++ gives at compile time (classes, templates, `constexpr`, RAII, `enum class`, namespaces, overloading, lambdas, virtual functions) and none of the runtime machinery that needs setting up before code can run.
 
 Two kinds of code stay in C:
 - **Each library's entry points.** AmigaOS calls a library with its arguments in registers and its base in A6. The jump table, the `LVO` stubs and the functions it points at stay C (or `extern "C"`), as they are generated from the SFD today. They call into C++.

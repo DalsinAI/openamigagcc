@@ -14,7 +14,7 @@ not moved the stack pointer. It read the word 4 bytes below `m`'s low word
 GCC chooses that push sequence when tuning for the 68040 or 68060 without a
 frame pointer: `-m68040`, `-m68060` or `-m68020 -mtune=68040` at `-O1`,
 `-O2` and `-Os`. `-fno-omit-frame-pointer`, `-mtune=68020` and `-O0` hid it.
-OpenGPU's affine compositing (ops 5 and 6 of its v1.2 golden scene) came out
+GFOpenGPU's affine compositing (ops 5 and 6 of its v1.2 golden scene) came out
 wrong; any `-m68040` or `-m68060` program doing 64-bit division by such a
 value was exposed.
 
@@ -26,11 +26,11 @@ mirror-image problem and gets the same correction.
 
 ## Reproducer
 
-`tests/repro/push64.c` is OpenGPU's 64-bit affine arithmetic, reduced.
+`tests/repro/push64.c` is GFOpenGPU's 64-bit affine arithmetic, reduced.
 
-| Compiler | `-O1 -m68040` | `-O1`, `-O2`, `-Os` with `-m68060` | OpenGPU golden v1.2 at `-O2 -m68040` |
+| Compiler | `-O1 -m68040` | `-O1`, `-O2`, `-Os` with `-m68060` | GFOpenGPU golden v1.2 at `-O2 -m68040` |
 | --- | --- | --- | --- |
 | GCC 16.2.0b as released | wrong (3 of 9 values) | wrong (2 or 3 of 9) | wrong (ops 5 and 6) |
-| OpenAmigaGCC | right | right | right |
+| GFOpenAmigaGCC | right | right | right |
 
-The same fault showed with `-m68060 -O2` in the inverse matrix of OpenGPU's affine code (`i11` became 0): the high word of `m << 32` was read from the sign half of the sign-extended `m`'s stack slot, `move.l 64(sp),-(sp)` after three pushes where `68(sp)` is right.
+The same fault showed with `-m68060 -O2` in the inverse matrix of GFOpenGPU's affine code (`i11` became 0): the high word of `m << 32` was read from the sign half of the sign-extended `m`'s stack slot, `move.l 64(sp),-(sp)` after three pushes where `68(sp)` is right.

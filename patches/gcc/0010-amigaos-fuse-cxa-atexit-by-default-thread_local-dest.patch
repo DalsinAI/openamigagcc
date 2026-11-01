@@ -36,7 +36,7 @@ index 51b9ee119..6cf034acd 100644
  	extra_options="${extra_options} m68k/amigaos.opt"
  	extra_gcc_objs="driver-amigaos.o"
  	gnu_ld=yes
-+	# OpenAmigaGCC: -fuse-cxa-atexit by default. GCC then registers every
++	# GFOpenAmigaGCC: -fuse-cxa-atexit by default. GCC then registers every
 +	# static and thread_local destructor (__cxa_atexit, __cxa_thread_atexit);
 +	# without it a thread_local's destructor never runs. libnix provides
 +	# __cxa_atexit and __dso_handle (openamigagcc patches/libnix/0005).

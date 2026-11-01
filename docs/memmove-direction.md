@@ -20,7 +20,7 @@ in their memory expressions. Everything else was copied forwards with
 - C++ `std::copy_backward` and `std::move_backward` on trivial types, which
   libstdc++ implements with `__builtin_memmove`.
 
-In each case the first element was smeared over the whole block. OpenCrypto's
+In each case the first element was smeared over the whole block. GFOpenCrypto's
 sntrup761 broke this way.
 
 `-fno-tree-loop-distribute-patterns` only covers the first case, and costs the speed of the block move (see `loop-distribution.md`).
@@ -54,5 +54,5 @@ unchanged.
 | Compiler | shift | memmove | copy_backward | 68000 shift / memmove |
 | --- | --- | --- | --- | --- |
 | GCC 16.2.0b as released | wrong at -O2, -Os | wrong at -O1, -O2, -Os | wrong at -O1, -O2, -Os | wrong |
-| OpenAmigaGCC | right | right | right | right |
-| OpenAmigaGCC with `-ftree-loop-distribute-patterns` | right | right | right | right |
+| GFOpenAmigaGCC | right | right | right | right |
+| GFOpenAmigaGCC with `-ftree-loop-distribute-patterns` | right | right | right | right |

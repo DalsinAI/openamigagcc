@@ -33,7 +33,7 @@ With the GCC 16.2 stove's libnix this did two wrong things:
 
 ## Results
 
-The tests ran on AmigaOS 3.2.3 (68040) under AmigaChrome, from a Shell with `Stack 4096` and from Workbench (`wbgo`, an icon with a 4096-byte stack). `stackdeep` checks the stack it runs on, then recurses about 190 KB deep.
+The tests ran on AmigaOS 3.2.3 (68040) under AmiCradle, from a Shell with `Stack 4096` and from Workbench (`wbgo`, an icon with a 4096-byte stack). `stackdeep` checks the stack it runs on, then recurses about 190 KB deep.
 
 | Test | Old libnix | Patched |
 | --- | --- | --- |

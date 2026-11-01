@@ -1,6 +1,6 @@
 #!/bin/bash
 # build.sh WORK PREFIX NDK_LHA [JOBS]
-# Builds OpenAmigaGCC (GCC 16.2 for m68k-amigaos with libnix) into PREFIX from
+# Builds GFOpenAmigaGCC (GCC 16.2 for m68k-amigaos with libnix) into PREFIX from
 # the sources fetch.sh put in WORK, with the patches in this repository.
 #   NDK_LHA  the AmigaOS 3.2 NDK archive (NDK3.2.lha), which you supply: it is
 #            not free software and is never fetched or kept here.
@@ -77,7 +77,7 @@ python3 "$HERE/scripts/fix_sfdc_base_order.py" "$WORK"/projects/sfdc/MacroGCC.pl
 
 # 2b. amiga-gcc's framework carries a prebuilt Commodore amiga.lib in lib/ and
 #     lib/libb/, which its libamiga step would install. Take them out of the
-#     work folder: OpenAmigaGCC's libamiga.a is OpenNDK's, built in step 5b.
+#     work folder: GFOpenAmigaGCC's libamiga.a is GFOpenNDK's, built in step 5b.
 rm -f "$WORK/lib/libamiga.a" "$WORK/lib/libb/libamiga.a"
 
 # 3. The NDK, from you.
@@ -110,15 +110,15 @@ for f in bin/m68k-amigaos-gprof m68k-amigaos/ndk-include/exec/types.h m68k-amiga
   [ -e "$PREFIX/$f" ] || { echo "the amiga-gcc build did not install $f (see $LOGS/make.log and $WORK/log)"; exit 1; }
 done
 
-# 5b. libamiga.a, from OpenNDK (projects/openamigasdk, pinned in
+# 5b. libamiga.a, from GFOpenNDK (projects/openamigasdk, pinned in
 #     scripts/sources.lock), in every multilib folder, each built with that
 #     multilib's own flags: "libm020/libm881;@mcpu=68020@m68881" gets
-#     -mcpu=68020 -m68881, "libb;@fbaserel" -fbaserel. OpenNDK's lib/build.sh puts
+#     -mcpu=68020 -m68881, "libb;@fbaserel" -fbaserel. GFOpenNDK's lib/build.sh puts
 #     -m68040 first, so a multilib that names no CPU gets -m68000 (this
 #     GCC's default) after it: the last CPU flag wins. Each old file is
 #     removed first, so a link to it (a stove's) is replaced, never written
 #     through. docs/openndk-libamiga.md.
-say "libamiga.a from OpenNDK"
+say "libamiga.a from GFOpenNDK"
 OPENNDK=$WORK/projects/openamigasdk/OpenNDK
 T=$PREFIX/m68k-amigaos
 "$PREFIX/bin/m68k-amigaos-gcc" -print-multi-lib | while IFS=';' read -r dir flags; do
@@ -126,7 +126,7 @@ T=$PREFIX/m68k-amigaos
   case " $fl " in *" -mcpu="*|*" -m680"[0-6]"0 "*) ;; *) fl="-m68000$fl" ;; esac
   log=$LOGS/openndk-libamiga-$([ "$dir" = . ] && echo plain || echo "${dir//\//-}").log
   ( PREFIX="$PREFIX/bin/m68k-amigaos-" EXTRA_CFLAGS="$fl" sh "$OPENNDK/lib/build.sh" ) > "$log" 2>&1 \
-    || { echo "OpenNDK's libamiga.a for multilib '$dir' ($fl) failed (see $log)"; exit 1; }
+    || { echo "GFOpenNDK's libamiga.a for multilib '$dir' ($fl) failed (see $log)"; exit 1; }
   mkdir -p "$T/lib/$dir"
   rm -f "$T/lib/$dir/libamiga.a"
   cp "$OPENNDK/lib/build/m68k-amigaos/libamiga.a" "$T/lib/$dir/libamiga.a"
@@ -201,11 +201,11 @@ while IFS= read -r a; do
   done
 done < <(find "$PREFIX/m68k-amigaos/libnix/lib" -name libnix.a)
 echo "libnix: $n mem*/calloc objects checked; none calls itself or a block function"
-# Every libamiga.a is OpenNDK's (its rexxvar.o; Commodore's amiga.lib has no
+# Every libamiga.a is GFOpenNDK's (its rexxvar.o; Commodore's amiga.lib has no
 # such member), and each multilib links the one in its own folder.
 n=0
 while IFS= read -r a; do
-  "$PREFIX/bin/m68k-amigaos-ar" t "$a" | grep -qx rexxvar.o || { echo "$a is not OpenNDK's libamiga.a"; exit 1; }
+  "$PREFIX/bin/m68k-amigaos-ar" t "$a" | grep -qx rexxvar.o || { echo "$a is not GFOpenNDK's libamiga.a"; exit 1; }
   n=$((n+1))
 done < <(find "$PREFIX/m68k-amigaos" "$PREFIX/lib" -name 'libamiga.a' -not -path '*/ndk*')
 "$CC" -print-multi-lib | while IFS=';' read -r dir flags; do
@@ -230,7 +230,7 @@ m68kdis() { # CPU LIB: "object/address S|I" for every word objdump shows
 done
 printf '#include <proto/exec.h>\n#include <clib/alib_protos.h>\nint main(void) { struct List l; NewList(&l); return IsListEmpty(&l) ? 0 : 1; }\n' > "$C/alib.c"
 "$CC" -m68040 -O2 -I"$OPENNDK/Include_H" -o "$C/alib" "$C/alib.c" -Wl,-Map,"$C/alib.map"
-grep -q 'openamigasdk/OpenNDK\|libamiga.a(newlist.o)' "$C/alib.map" || { echo "a NewList program did not link OpenNDK's libamiga.a"; exit 1; }
-echo "libamiga.a: $n copies, all OpenNDK's; every multilib links its own"
+grep -q 'openamigasdk/OpenNDK\|libamiga.a(newlist.o)' "$C/alib.map" || { echo "a NewList program did not link GFOpenNDK's libamiga.a"; exit 1; }
+echo "libamiga.a: $n copies, all GFOpenNDK's; every multilib links its own"
 echo "defaults: $("$CC" -### -c -x c /dev/null 2>&1 | grep -o -- '-fno-[a-z-]*' | sort -u | tr '\n' ' ')"
-echo "OpenAmigaGCC built in $PREFIX"
+echo "GFOpenAmigaGCC built in $PREFIX"

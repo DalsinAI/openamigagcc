@@ -28,7 +28,7 @@ index a2df75088..57b04eb87 100644
 +#define DRIVER_SELF_SPECS "%{!mcrt=*:%{!noixemul:%{!nostdlib:-mcrt=nix20}}}", \
 +  OPENAMIGAGCC_SAFE_DEFAULTS
 +
-+/* OpenAmigaGCC: safe defaults, built into the driver so no build has to
++/* GFOpenAmigaGCC: safe defaults, built into the driver so no build has to
 +   remember them and the link setup (-mcrt) is untouched.  Each one can be
 +   turned back on with its positive option on the command line.
 +   - Address 0 is memory on a 68k Amiga (chip RAM, exec's pointer at 4).

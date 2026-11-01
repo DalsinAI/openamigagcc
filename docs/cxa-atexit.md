@@ -58,7 +58,7 @@ Lab `cxx`, a copy of Instance-32 (AmigaOS 3.2.3, Kickstart 47.115), 12 October 2
 
 Its libstdc++ is the live stove's.
 
-"Full rebuild" is `scripts/build.sh` with every patch on `main` plus these and libnix 0006 (#11), run without network at the stove's paths (`/opt/src`, `/opt/amiga`) as the 9 October release was. It took 35 minutes 45 seconds with 8 jobs on the Team's machine (x86 cores), and its own checks passed. Its libstdc++ is built with the new default: it calls `__cxa_atexit` (14 references in the 68020/68881 multilib, none in the live stove's). It has every file the live stove has, except the developer kits the stove installer adds afterwards (OpenGPU SDK, SDL2 and the other headers). It also has libpthread's aros-stuff 0003 and 0004, which are on `main` but not in the live stove.
+"Full rebuild" is `scripts/build.sh` with every patch on `main` plus these and libnix 0006 (#11), run without network at the stove's paths (`/opt/src`, `/opt/amiga`) as the 9 October release was. It took 35 minutes 45 seconds with 8 jobs on the Team's machine (x86 cores), and its own checks passed. Its libstdc++ is built with the new default: it calls `__cxa_atexit` (14 references in the 68020/68881 multilib, none in the live stove's). It has every file the live stove has, except the developer kits the stove installer adds afterwards (GFOpenGPU SDK, SDL2 and the other headers). It also has libpthread's aros-stuff 0003 and 0004, which are on `main` but not in the live stove.
 
 A middle step checked libnix on its own. It used the copy's new libnix with the live stove's `cc1plus`, and built each test with an explicit `-fuse-cxa-atexit` and no `__dso_handle` of its own:
 - t12, t13, t19 and `dtors` passed;

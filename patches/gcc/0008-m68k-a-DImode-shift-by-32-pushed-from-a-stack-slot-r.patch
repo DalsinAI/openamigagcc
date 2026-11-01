@@ -9,7 +9,7 @@ the low word of x. When x is in a stack slot, (sp,N), the second push read
 (sp,N+4) as addressed before the first push, so it got the word 4 bytes
 below: the sign word instead of the value. GCC makes this push for a
 64-bit libcall argument such as (s64)m * 4294967296 / d (__divdi3) when
-tuning for the 68040 or 68060, without a frame pointer; OpenGPU's affine
+tuning for the 68040 or 68060, without a frame pointer; GFOpenGPU's affine
 compositing came out wrong at -O1, -O2 and -Os with -m68040, -m68060 and
 -m68020 -mtune=68040.
 

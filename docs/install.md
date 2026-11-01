@@ -1,4 +1,4 @@
-# Installing OpenAmigaGCC 16.2.0-open4
+# Installing GFOpenAmigaGCC 16.2.0-open4
 
 GCC 16.2 for AmigaOS 3.x on 68k (`m68k-amigaos`), including AmigaOS 3.2.3, with binutils 2.46, libnix, libpthread, libgcc and libstdc++ (C++23), and the Team's fixes. It is built from bebbo's amiga-gcc line (GCC 16.2.0b) and runs on x86-64 Linux. For ARM64 Linux, use 16.2.0-open1's toolchain until an open3 ARM64 build is published.
 
