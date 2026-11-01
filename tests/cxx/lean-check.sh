@@ -2,7 +2,7 @@
 # lean-check.sh: compile lean.cpp with the lean C++ library profile
 # (docs/lean-cxx.md) and fail if the object needs anything the profile forbids.
 #   CXX  the compiler (default m68k-amigaos-g++)   NM  its nm (default m68k-amigaos-nm)
-# MIT. Copyright (c) 2026 AmigaChrome Team.
+# MIT. Copyright (c) 2026 AmiCradle Team.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 CXX=${CXX:-m68k-amigaos-g++}; NM=${NM:-m68k-amigaos-nm}

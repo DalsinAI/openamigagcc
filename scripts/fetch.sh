@@ -5,7 +5,7 @@
 # With MIRROR (a folder holding an earlier amiga-gcc checkout, laid out the
 # same way), every repository is cloned from there instead of the network.
 # The AmigaOS NDK is not fetched: build.sh takes it from you.
-# GPL-3.0-or-later, like the patches it goes with. Copyright (c) 2026 AmigaChrome Team.
+# GPL-3.0-or-later, like the patches it goes with. Copyright (c) 2026 AmiCradle Team.
 set -euo pipefail
 WORK=$1; MIRROR=${2:-}
 HERE=$(cd "$(dirname "$0")" && pwd)

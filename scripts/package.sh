@@ -5,7 +5,7 @@
 # framework and its modules as built, with this repository) and OUT/SHA256SUMS.
 # It stops if either tarball would carry an NDK folder, an amiga.lib or a libamiga.a that is not
 # GFOpenNDK's (docs/openndk-libamiga.md).
-# GPL-3.0-or-later. Copyright (c) 2026 AmigaChrome Team.
+# GPL-3.0-or-later. Copyright (c) 2026 AmiCradle Team.
 set -euo pipefail
 WORK=$(cd "$1" && pwd); PREFIX=$(cd "$2" && pwd); mkdir -p "$3"; OUT=$(cd "$3" && pwd); V=$4
 HERE=$(cd "$(dirname "$0")/.." && pwd)

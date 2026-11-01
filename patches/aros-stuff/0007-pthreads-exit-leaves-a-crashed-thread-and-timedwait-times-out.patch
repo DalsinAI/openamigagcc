@@ -40,7 +40,7 @@ tests/pthreads/exitpark.c shows both. On a lab copy of Instance-32
 
 joinsig.c (0006) still passes with 0007.
 
-zlib licence, as aros-stuff's pthreads (README, docs/install.md). Copyright (c) 2026 AmigaChrome Team.
+zlib licence, as aros-stuff's pthreads (README, docs/install.md). Copyright (c) 2026 AmiCradle Team.
 ---
 diff --git a/pthreads/pthread.c b/pthreads/pthread.c
 index 3761644..5549de2 100644

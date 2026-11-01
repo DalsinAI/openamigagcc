@@ -4,7 +4,7 @@
  *   exitpark join    a thread ends normally; main joins at exit as before
  *   exitpark timed   timedwait: an absolute time already past, then 200 ms ahead
  * Prints EXITPARK lines; the Shell's RC shows that the program returned.
- * zlib licence, as aros-stuff's pthreads. Copyright (c) 2026 AmigaChrome Team. */
+ * zlib licence, as aros-stuff's pthreads. Copyright (c) 2026 AmiCradle Team. */
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>

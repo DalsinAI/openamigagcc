@@ -1,5 +1,5 @@
 /* Minimal runtime for the reproducers: raw 68k images run under qemu-m68k
-   (Linux syscalls through trap #0). MIT licence, Copyright (c) 2026 AmigaChrome Team. */
+   (Linux syscalls through trap #0). MIT licence, Copyright (c) 2026 AmiCradle Team. */
 #include <stddef.h>
 extern int sys_write(const void *, size_t);
 void *memcpy(void *d, const void *s, size_t n) { volatile unsigned char *a = d; const unsigned char *b = s; while (n--) *a++ = *b++; return d; }

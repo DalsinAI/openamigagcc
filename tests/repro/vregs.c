@@ -5,7 +5,7 @@
    that are registers or memory, not this address, so the virtual register
    stayed, combine then dropped it, and the copy went to strlen(want) - 600,
    an absolute address.  GFOffice's OWFLibTest (owf_lib_checks.c), reduced.
-   MIT licence, Copyright (c) 2026 AmigaChrome Team. */
+   MIT licence, Copyright (c) 2026 AmiCradle Team. */
 #include <string.h>
 extern void puts_(const char *);
 #define PHRASE "owf.library 2 inflates this with libowf's own inflate. "
