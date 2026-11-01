@@ -4,7 +4,7 @@
 # would, apply its relocations, and wrap the image as a static big-endian ELF
 # with one PT_LOAD, so qemu-m68k (user mode) can run it. The image talks to
 # the outside through Linux m68k syscalls (trap #0): write and exit.
-# MIT licence, Copyright (c) 2026 AmigaChrome Team.
+# MIT licence, Copyright (c) 2026 AmiCradle Team.
 import struct
 import sys
 

@@ -6,7 +6,7 @@
    fmt is GFOffice's owf_number_text (libowf), reduced: 6.5 came out "6.w".
    The copy loops are PR123853's (SImode, HImode, SFmode), and the same for
    bytes, 64-bit and 96-bit values (DImode, DFmode, XFmode).
-   MIT licence, Copyright (c) 2026 AmigaChrome Team. */
+   MIT licence, Copyright (c) 2026 AmiCradle Team. */
 extern void puts_(const char *); extern void puti(long);
 
 __attribute__((noinline)) void fmt(char *out, const char *src, int nd, int e)

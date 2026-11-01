@@ -10,7 +10,7 @@
 # NIXOBJ (optional): objects linked ahead of the stove's libnix in the softfloat
 # reproducer, such as a fixed __initlibraries.o, to prove a libnix fix before a
 # stove rebuild.
-# MIT licence, Copyright (c) 2026 AmigaChrome Team.
+# MIT licence, Copyright (c) 2026 AmiCradle Team.
 set -u
 B=$1; shift
 D=$(cd "$(dirname "$0")" && pwd)

@@ -6,7 +6,7 @@
 # libsupc++ hold no LDFCM typeinfo pools (the PC-relative indirect EH data
 # that crossed hunks). Running catch.cpp needs an Amiga (the lab). C++ with
 # exceptions links -lpthread: libstdc++'s eh_globals and libgcc's unwinder use it.
-# GPL-3.0-or-later, like the patches it goes with. Copyright (c) 2026 AmigaChrome Team.
+# GPL-3.0-or-later, like the patches it goes with. Copyright (c) 2026 AmiCradle Team.
 set -u
 P=$1; CXX="$P/bin/m68k-amigaos-g++"; OBJDUMP="$P/bin/m68k-amigaos-objdump"
 D=$(cd "$(dirname "$0")" && pwd); O=$(mktemp -d); bad=0

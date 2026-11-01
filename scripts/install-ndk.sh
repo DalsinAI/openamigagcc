@@ -8,7 +8,7 @@
 #   NDK3.2.lha  the NDK archive you have (Aminet dev/misc/NDK3.2.lha); it is
 #               not free software and is not part of GFOpenAmigaGCC
 # Needs lha (lhasa), a host C compiler (for fd2sfd and fd2pragma), make, rsync.
-# GPL-3.0-or-later. Copyright (c) 2026 AmigaChrome Team.
+# GPL-3.0-or-later. Copyright (c) 2026 AmiCradle Team.
 set -euo pipefail
 SRC=$(cd "$1" && pwd); PREFIX=$(cd "$2" && pwd); NDK=$3
 HERE=$(cd "$(dirname "$0")" && pwd)

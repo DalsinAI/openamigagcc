@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2026 AmigaChrome Team. GPL-3.0-or-later, like the patches it goes with.
+# Copyright (c) 2026 AmiCradle Team. GPL-3.0-or-later, like the patches it goes with.
 # Base-relative C++ with the os32-gcc16 stove: t3_threads.cpp (amigachrome-stoves
 # os32-gcc16/tests/src) built three ways.
 #   build.sh [OUT]     STOVE: a stove folder with prefix/ and compat/ (default ~/AmiCradle/stoves/os32-gcc16)

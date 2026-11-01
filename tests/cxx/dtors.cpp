@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 AmigaChrome Team
+// Copyright (c) 2026 AmiCradle Team
 // dtors: C++ destructors at thread exit and program exit, built with the
 // compiler's defaults (no -fuse-cxa-atexit, no __dso_handle of its own).
 //   - a thread_local at namespace scope, used in a thread: destroyed when
